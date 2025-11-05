@@ -167,9 +167,9 @@ service cloud.firestore {
               const message = `${new Date().toLocaleDateString('ja-JP')}の目薬が使用されていません（テスト通知）`;
               console.log('[FamilyNotification] テスト通知送信開始:', { userId: user.uid, email: user.email });
               try {
-                await notifyFamily(user.uid, message);
+                await notifyFamily(user.uid, message, user.email);
                 console.log('[FamilyNotification] テスト通知送信完了');
-                alert(`家族にテスト通知を送信しました。\n\n送信先: 登録されている家族メンバー\n家族メンバーがログインしているデバイスで確認してください。`);
+                alert(`家族にテスト通知を送信しました。\n\n送信先: 本人と登録されている家族メンバー\n本人と家族メンバーがログインしているデバイスで確認してください。`);
               } catch (err) {
                 console.error('[FamilyNotification] テスト通知送信エラー:', err);
                 alert(`通知送信に失敗しました: ${err.message || err.code || '不明なエラー'}`);
@@ -186,7 +186,7 @@ service cloud.firestore {
 }
 
 // 家族に通知を送信する関数（エクスポート）
-export async function notifyFamily(userId, message) {
+export async function notifyFamily(userId, message, userEmail = null) {
   try {
     // 家族メンバーを取得
     const q = query(
@@ -197,14 +197,30 @@ export async function notifyFamily(userId, message) {
     const familyEmails = snapshot.docs.map(doc => doc.data().email);
     console.log('[notifyFamily] 家族メンバー:', familyEmails);
 
-    if (familyEmails.length === 0) {
-      console.warn('[notifyFamily] 家族メンバーが登録されていません');
+    // 通知を送る対象のメールアドレスリスト（本人 + 家族メンバー）
+    const targetEmails = [];
+    
+    // 本人のメールアドレスを追加（指定されている場合）
+    if (userEmail) {
+      targetEmails.push(userEmail);
+      console.log('[notifyFamily] 本人にも通知を送信:', userEmail);
+    }
+    
+    // 家族メンバーのメールアドレスを追加（重複を避ける）
+    for (const email of familyEmails) {
+      if (!targetEmails.includes(email)) {
+        targetEmails.push(email);
+      }
+    }
+
+    if (targetEmails.length === 0) {
+      console.warn('[notifyFamily] 通知を送る対象がありません');
       return;
     }
 
-    // 各家族メンバーのユーザーIDを取得して通知を作成
+    // 各メンバーに通知を作成
     const notifications = [];
-    for (const email of familyEmails) {
+    for (const email of targetEmails) {
       notifications.push({
         email: email,
         message: message,
@@ -220,7 +236,7 @@ export async function notifyFamily(userId, message) {
       console.log('[notifyFamily] 通知を保存:', { id: docRef.id, email: notif.email });
     }
     
-    console.log('[notifyFamily] すべての通知を送信完了');
+    console.log('[notifyFamily] すべての通知を送信完了:', targetEmails.length, '件');
   } catch (err) {
     console.error('家族通知送信エラー:', err);
     throw err;

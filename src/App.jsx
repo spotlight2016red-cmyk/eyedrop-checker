@@ -616,7 +616,8 @@ function AppContent() {
               requireInteraction: false
             });
             if (user) {
-              await notifyFamily(user.uid, message);
+              // 本人と家族の両方に通知を送信（Firestore経由）
+              await notifyFamily(user.uid, message, user.email);
             }
           }}
         />
