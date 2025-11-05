@@ -13,6 +13,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [remainingTime, setRemainingTime] = useState(null);
   const lastFrameRef = useRef(null);
   const intervalRef = useRef(null);
+  const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
 
   const NO_MOTION_THRESHOLD = testMode ? 30 * 1000 : 5 * 60 * 1000; // テストモード: 30秒、通常: 5分（ミリ秒）
   
@@ -138,6 +139,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     }
     setNoMotionStartTime(null);
     setRemainingTime(null);
+    motionHistoryRef.current = []; // 動きの履歴をクリア
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -167,18 +169,41 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       ctx.drawImage(video, 0, 0);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const hasMotion = detectFrameDifference(imageData);
+      const motionResult = detectFrameDifference(imageData);
+      const hasMotion = motionResult.hasMotion;
+      const intensity = motionResult.intensity;
 
       if (hasMotion) {
-        setMotionCount(prev => prev + 1);
-        if (onMotionDetected) onMotionDetected();
-        // 動きがあったらタイマーをリセット
-        if (noMotionTimer) {
-          clearTimeout(noMotionTimer);
-          setNoMotionTimer(null);
+        // 動きの履歴を記録
+        motionHistoryRef.current.push({
+          time: Date.now(),
+          intensity: intensity
+        });
+        
+        // 連続した動きパターンを検出（目薬を取ってさす動作）
+        const isEyedropPattern = checkMotionPattern();
+        
+        if (isEyedropPattern) {
+          // 目薬をさす動作パターンを検出した場合、タイマーをリセット
+          console.log('[CameraMonitor] 目薬をさす動作を検出、タイマーをリセット');
+          setMotionCount(prev => prev + 1);
+          if (onMotionDetected) onMotionDetected();
+          
+          // タイマーをリセット
+          if (noMotionTimer) {
+            clearTimeout(noMotionTimer);
+            setNoMotionTimer(null);
+          }
+          setNoMotionStartTime(null);
+          setRemainingTime(null);
+          
+          // 動きの履歴をクリア
+          motionHistoryRef.current = [];
+        } else {
+          // 単発の動きだけではタイマーをリセットしない（冷蔵庫を開けるだけでは通知しない）
+          // ただし、動き検出回数は増やす
+          setMotionCount(prev => prev + 1);
         }
-        setNoMotionStartTime(null);
-        setRemainingTime(null);
       } else {
         // 動きが検出されない場合、タイマーを開始
         const now = Date.now();
@@ -232,12 +257,13 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const detectFrameDifference = (currentImageData) => {
     if (!lastFrameRef.current) {
       lastFrameRef.current = currentImageData;
-      return false;
+      return { hasMotion: false, intensity: 0 };
     }
 
     const currentData = currentImageData.data;
     const lastData = lastFrameRef.current.data;
     let diffPixels = 0;
+    let totalDiff = 0;
     const threshold = 30; // 輝度差分の閾値
 
     for (let i = 0; i < currentData.length; i += 4) {
@@ -248,13 +274,48 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
 
       if (avgDiff > threshold) {
         diffPixels++;
+        totalDiff += avgDiff;
       }
     }
 
     const diffRatio = diffPixels / (currentData.length / 4);
+    const intensity = diffPixels > 0 ? totalDiff / diffPixels : 0; // 平均的な動きの強度
     lastFrameRef.current = currentImageData;
     
-    return diffRatio > 0.05; // 5%以上の変化があれば動きあり
+    return { 
+      hasMotion: diffRatio > 0.05, // 5%以上の変化があれば動きあり
+      intensity: intensity
+    };
+  };
+
+  // 連続した動きパターンを検出（目薬を取ってさす動作）
+  const checkMotionPattern = () => {
+    const now = Date.now();
+    const history = motionHistoryRef.current;
+    
+    // 30秒以内の動きを保持
+    const recentHistory = history.filter(h => now - h.time < 30000);
+    motionHistoryRef.current = recentHistory;
+    
+    if (recentHistory.length < 3) {
+      return false; // 動きが少なすぎる
+    }
+    
+    // 動きの強度を分析
+    const intensities = recentHistory.map(h => h.intensity);
+    const avgIntensity = intensities.reduce((a, b) => a + b, 0) / intensities.length;
+    
+    // 大きな動き（冷蔵庫を開ける）と小さな動き（目薬をさす）の両方が検出された場合
+    // これは目薬を取ってさす動作パターンと判断
+    const hasLargeMotion = intensities.some(i => i > 50); // 大きな動き
+    const hasSmallMotion = intensities.some(i => i > 0 && i < 50); // 小さな動き
+    
+    if (hasLargeMotion && hasSmallMotion && recentHistory.length >= 3) {
+      console.log('[CameraMonitor] 目薬をさす動作パターンを検出');
+      return true;
+    }
+    
+    return false;
   };
 
   const formatTime = (ms) => {
@@ -344,6 +405,10 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         <div className="camera-placeholder">
           <p>カメラ監視を開始すると、動きを検出します。</p>
           <p>{testMode ? '30秒' : '5分'}間動きが検出されない場合、通知が送られます。</p>
+          <p style={{ marginTop: '12px', fontSize: '12px', color: '#64748b' }}>
+            ※ 目薬を取ってさす動作（連続した動きパターン）を検出した場合、タイマーをリセットします。<br/>
+            ※ 冷蔵庫を開けるだけの単発の動きでは通知しません。
+          </p>
         </div>
       )}
     </div>
