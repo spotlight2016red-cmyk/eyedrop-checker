@@ -209,10 +209,10 @@ function App() {
               if (!('Notification' in window)) return alert('このブラウザは通知に未対応です');
               if (Notification.permission !== 'granted') {
                 Notification.requestPermission().then((p) => {
-                  if (p === 'granted') showNotification('テスト通知', { body: '目薬チェックのテストです' });
+                  if (p === 'granted') showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
                 });
               } else {
-                showNotification('テスト通知', { body: '目薬チェックのテストです' });
+                showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
               }
             }}
           >テスト通知</button>
