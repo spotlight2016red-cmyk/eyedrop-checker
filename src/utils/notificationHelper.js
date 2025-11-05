@@ -5,15 +5,22 @@ export async function requestPermission() {
 }
 
 export async function showNotification(title, options = {}) {
+  console.log('[NotifHelper] Showing notification:', title, options);
   try {
     if ('serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) return reg.showNotification(title, options);
+      if (reg) {
+        console.log('[NotifHelper] Using SW to show notification');
+        return reg.showNotification(title, options);
+      }
     }
     if ('Notification' in window && Notification.permission === 'granted') {
+      console.log('[NotifHelper] Using Notification API directly');
       return new Notification(title, options);
     }
-  } catch {}
+  } catch (e) {
+    console.error('[NotifHelper] Error showing notification:', e);
+  }
 }
 
 function parseTimeToToday(timeStr) {

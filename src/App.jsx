@@ -73,13 +73,16 @@ function App() {
     // SWからのpostMessage（フォーカスのみでナビゲートしないケースのバックアップ表示）
     if ('serviceWorker' in navigator) {
       const onMsg = (e) => {
+        console.log('[App] SW message received:', e.data);
         const data = e.data || {};
         if (data.type === 'from-notification' && data.slot) {
+          console.log('[App] Showing banner from notification:', data.slot);
           const jp2 = data.slot === 'morning' ? '朝' : data.slot === 'noon' ? '昼' : '夜';
           setBanner({ text: `通知から開きました（${jp2}）`, slot: data.slot });
         }
         // localStorageフラグを立てる指示
         if (data.type === 'set-notif-flag' && data.slot && data.date) {
+          console.log('[App] Setting notif flag:', data.slot, data.date);
           try {
             localStorage.setItem('eyedrop-checker:notif-flag', JSON.stringify({ slot: data.slot, date: data.date }));
           } catch {}
@@ -93,21 +96,31 @@ function App() {
           const flag = localStorage.getItem('eyedrop-checker:notif-flag');
           if (flag) {
             const parsed = JSON.parse(flag);
+            console.log('[App] Found notif flag:', parsed);
             if (parsed.slot && parsed.date === key) {
               const jp3 = parsed.slot === 'morning' ? '朝' : parsed.slot === 'noon' ? '昼' : '夜';
+              console.log('[App] Showing banner from flag:', parsed.slot);
               setBanner({ text: `通知から開きました（${jp3}）`, slot: parsed.slot });
               localStorage.removeItem('eyedrop-checker:notif-flag');
             }
           }
-        } catch {}
+        } catch (e) {
+          console.error('[App] Error checking flag:', e);
+        }
       };
       
       // フォーカス時と初回ロード時にチェック
       checkFlag();
-      const onFocus = () => setTimeout(checkFlag, 100);
+      const onFocus = () => {
+        console.log('[App] Window focused, checking flag...');
+        setTimeout(checkFlag, 100);
+      };
       window.addEventListener('focus', onFocus);
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) setTimeout(checkFlag, 100);
+        if (!document.hidden) {
+          console.log('[App] Page visible, checking flag...');
+          setTimeout(checkFlag, 100);
+        }
       });
       
       return () => {
@@ -256,12 +269,36 @@ function App() {
           </label>
           <button
             className="btn"
-            onClick={() => {
-              if (!('Notification' in window)) return alert('このブラウザは通知に未対応です');
+            onClick={async () => {
+              if (!('Notification' in window)) {
+                alert('このブラウザは通知に未対応です。ChromeまたはSafariでホーム画面に追加してください。');
+                return;
+              }
+              // Service WorkerとPWAチェック
+              const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                           (window.navigator.standalone === true) ||
+                           document.referrer.includes('android-app://');
+              const hasSW = 'serviceWorker' in navigator;
+              let swRegistered = false;
+              if (hasSW) {
+                try {
+                  const reg = await navigator.serviceWorker.getRegistration();
+                  swRegistered = !!reg;
+                } catch {}
+              }
+              
+              if (!isPWA && !swRegistered) {
+                alert('通知を使うには、ホーム画面に追加（PWAインストール）が必要です。\n\n手順:\n1. ブラウザメニューから「ホーム画面に追加」を選択\n2. インストール後、アイコンからアプリを起動\n3. 再度テスト通知を試してください');
+                return;
+              }
+              
               if (Notification.permission !== 'granted') {
-                Notification.requestPermission().then((p) => {
-                  if (p === 'granted') showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
-                });
+                const p = await Notification.requestPermission();
+                if (p === 'granted') {
+                  showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
+                } else if (p === 'denied') {
+                  alert('通知が拒否されました。ブラウザの設定から通知を許可してください。');
+                }
               } else {
                 showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
               }
