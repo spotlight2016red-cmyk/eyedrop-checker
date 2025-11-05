@@ -198,7 +198,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         <h2>カメラ監視モード</h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {!isActive && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', color: '#1f2937' }}>
               <input
                 type="checkbox"
                 checked={testMode}

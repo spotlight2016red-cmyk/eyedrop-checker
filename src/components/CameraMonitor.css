@@ -17,6 +17,7 @@
   font-size: 20px;
   font-weight: 700;
   margin: 0;
+  color: #1f2937;
 }
 
 .camera-toggle {
@@ -59,6 +60,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 14px;
+  color: #1f2937;
 }
 
 .status-indicator {
