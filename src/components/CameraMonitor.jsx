@@ -52,6 +52,29 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     };
   }, [isActive, testMode]);
 
+  // 監視開始時に即座にタイマーを開始（PWAでも動作するように）
+  useEffect(() => {
+    if (!isActive || !stream) return;
+    
+    // 監視開始時に即座にタイマーを開始
+    if (!noMotionStartTime) {
+      const now = Date.now();
+      setNoMotionStartTime(now);
+      setRemainingTime(NO_MOTION_THRESHOLD);
+      console.log('[CameraMonitor] 監視開始: タイマーを開始', NO_MOTION_THRESHOLD);
+      
+      // タイマーを設定
+      const timer = setTimeout(() => {
+        console.log('[CameraMonitor] タイマー完了（動き検出なし）');
+        if (onNoMotion) onNoMotion();
+        setNoMotionTimer(null);
+        setNoMotionStartTime(null);
+        setRemainingTime(null);
+      }, NO_MOTION_THRESHOLD);
+      setNoMotionTimer(timer);
+    }
+  }, [isActive, stream, NO_MOTION_THRESHOLD, noMotionStartTime]);
+
   // バックグラウンドになったときにタイマーを開始
   useEffect(() => {
     if (!isActive) return;
