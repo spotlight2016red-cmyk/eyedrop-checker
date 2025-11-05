@@ -185,7 +185,7 @@ export function startScheduler(getData, getSettings) {
 
       // window: trigger within 0..59,000 ms (same minute)
       if (diffMs >= 0 && diffMs < 60000 && !alreadyNotifiedToday && !alreadyDone) {
-        await showNotification('目薬の時間です', {
+        const notificationOptions = {
           body: `${slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : '夜'}の目薬を忘れずに。` ,
           tag: `eyedrop-${slot}-${todayKey}`,
           renotify: true,
@@ -193,7 +193,33 @@ export function startScheduler(getData, getSettings) {
           badge: '/vite.svg',
           icon: '/vite.svg',
           data: { slot, date: todayKey }
-        });
+        };
+        
+        const result = await showNotification('目薬の時間です', notificationOptions);
+        
+        // フォーカス中の場合は即座にページ内バナーも表示
+        if (document.hasFocus() && result) {
+          let notificationShown = false;
+          result.onshow = () => {
+            notificationShown = true;
+          };
+          
+          // 1秒後に通知が表示されていない場合はページ内バナーを表示
+          setTimeout(() => {
+            if (!notificationShown) {
+              console.log('[Scheduler] フォーカス中のためページ内バナーを表示:', slot);
+              window.dispatchEvent(new CustomEvent('show-in-app-notification', {
+                detail: {
+                  title: '目薬の時間です',
+                  body: notificationOptions.body,
+                  slot,
+                  date: todayKey
+                }
+              }));
+            }
+          }, 1000);
+        }
+        
         // store last notified via localStorage (settings saver should pick up)
         try {
           const newSettings = { ...settings, lastNotified: { ...(settings.lastNotified ?? {}), [slot]: todayKey } };
