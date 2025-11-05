@@ -11,7 +11,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [testMode, setTestMode] = useState(false);
   const [noMotionStartTime, setNoMotionStartTime] = useState(null);
   const [remainingTime, setRemainingTime] = useState(null);
-  const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null, paused: true });
+  const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
   const lastFrameRef = useRef(null);
   const intervalRef = useRef(null);
   const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
@@ -137,6 +137,9 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       // video要素にストリームを設定
       videoRef.current.srcObject = mediaStream;
       
+      // ストリーム設定を状態に反映
+      setCameraStatus(prev => ({ ...prev, hasSrcObject: true }));
+      
       // video要素のイベントを監視
       videoRef.current.onloadedmetadata = () => {
         console.log('[CameraMonitor] メタデータ読み込み完了');
@@ -147,7 +150,8 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           height: videoRef.current?.videoHeight || 0,
           readyState: videoRef.current?.readyState || 0,
           error: null,
-          paused: videoRef.current?.paused ?? true
+          paused: videoRef.current?.paused ?? true,
+          hasSrcObject: !!videoRef.current?.srcObject
         });
         
         // メタデータ読み込み後、再生を開始
@@ -167,7 +171,8 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         setCameraStatus(prev => ({
           ...prev,
           readyState: videoRef.current?.readyState || 0,
-          paused: videoRef.current?.paused ?? true
+          paused: videoRef.current?.paused ?? true,
+          hasSrcObject: !!videoRef.current?.srcObject
         }));
         // 再生を再試行
         if (videoRef.current && videoRef.current.paused) {
@@ -200,7 +205,8 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         console.error('[CameraMonitor] video要素エラー:', e);
         setCameraStatus(prev => ({
           ...prev,
-          error: videoRef.current?.error?.message || 'エラーが発生しました'
+          error: videoRef.current?.error?.message || 'エラーが発生しました',
+          hasSrcObject: !!videoRef.current?.srcObject
         }));
       };
       
@@ -216,7 +222,8 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             height: videoRef.current.videoHeight || 0,
             readyState: hasMetadata && currentReadyState === 0 ? 1 : currentReadyState, // メタデータが読み込まれている場合は1以上に設定
             error: videoRef.current.error ? videoRef.current.error.message : null,
-            paused: videoRef.current.paused
+            paused: videoRef.current.paused,
+            hasSrcObject: !!videoRef.current.srcObject
           });
           
           // 再生状態を確認して、停止している場合は再開
@@ -302,7 +309,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     }
     setNoMotionStartTime(null);
     setRemainingTime(null);
-    setCameraStatus({ width: 0, height: 0, readyState: 0, error: null, paused: true });
+    setCameraStatus({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
     motionHistoryRef.current = []; // 動きの履歴をクリア
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -525,12 +532,30 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             playsInline
             muted
             className="camera-video"
-            onClick={() => {
+            onClick={async () => {
               // 動画要素をクリックしたときに再生を開始
-              if (videoRef.current && videoRef.current.paused) {
-                videoRef.current.play().catch(err => {
-                  console.error('[CameraMonitor] クリック時の再生エラー:', err);
-                });
+              console.log('[CameraMonitor] 動画要素クリック');
+              console.log('[CameraMonitor] video要素の状態:', {
+                paused: videoRef.current?.paused,
+                readyState: videoRef.current?.readyState,
+                srcObject: videoRef.current?.srcObject ? '設定済み' : '未設定',
+                videoWidth: videoRef.current?.videoWidth,
+                videoHeight: videoRef.current?.videoHeight
+              });
+              
+              if (videoRef.current) {
+                if (videoRef.current.paused) {
+                  try {
+                    await videoRef.current.play();
+                    console.log('[CameraMonitor] クリック時の再生成功');
+                    setCameraStatus(prev => ({ ...prev, paused: false }));
+                  } catch (err) {
+                    console.error('[CameraMonitor] クリック時の再生エラー:', err);
+                    alert(`動画の再生に失敗しました: ${err.message}\n\nデバッグ情報:\n- paused: ${videoRef.current.paused}\n- readyState: ${videoRef.current.readyState}\n- srcObject: ${videoRef.current.srcObject ? '設定済み' : '未設定'}`);
+                  }
+                } else {
+                  console.log('[CameraMonitor] 既に再生中');
+                }
               }
             }}
             style={{ cursor: 'pointer' }}
@@ -550,20 +575,37 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             </div>
           )}
           {cameraStatus.width > 0 && cameraStatus.height > 0 && cameraStatus.paused && (
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              color: '#fff',
-              fontSize: '14px',
-              textAlign: 'center',
-              pointerEvents: 'none',
-              background: 'rgba(0, 0, 0, 0.5)',
-              padding: '8px 16px',
-              borderRadius: '8px'
-            }}>
-              タップして再生
+            <div 
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                color: '#fff',
+                fontSize: '14px',
+                textAlign: 'center',
+                pointerEvents: 'auto',
+                background: 'rgba(0, 0, 0, 0.7)',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                zIndex: 10
+              }}
+              onClick={async () => {
+                console.log('[CameraMonitor] 再生ボタンクリック');
+                if (videoRef.current) {
+                  try {
+                    await videoRef.current.play();
+                    console.log('[CameraMonitor] 再生ボタンから再生成功');
+                    setCameraStatus(prev => ({ ...prev, paused: false }));
+                  } catch (err) {
+                    console.error('[CameraMonitor] 再生ボタンから再生エラー:', err);
+                    alert(`動画の再生に失敗しました: ${err.message}`);
+                  }
+                }
+              }}
+            >
+              ▶️ タップして再生
             </div>
           )}
           <canvas ref={canvasRef} className="camera-canvas" style={{ display: 'none' }} />
@@ -597,14 +639,17 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
                 )}
                 {/* カメラ状態 */}
                 <div style={{ marginTop: '8px', borderTop: '1px solid #d1d5db', paddingTop: '8px' }}>
-                  <div>カメラ状態: {stream || (videoRef.current && videoRef.current.srcObject) ? '接続済み' : '未接続'}</div>
+                  <div>カメラ状態: {stream || cameraStatus.hasSrcObject ? '接続済み' : '未接続'}</div>
                   <div>動画サイズ: {cameraStatus.width} x {cameraStatus.height}</div>
                   <div>再生状態: {cameraStatus.readyState === 4 ? '準備完了' : `準備中(${cameraStatus.readyState})`}</div>
                   <div>再生中: {cameraStatus.paused ? '停止中' : '再生中'}</div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                    srcObject: {cameraStatus.hasSrcObject ? '✅' : '❌'}
+                  </div>
                   {cameraStatus.error && (
                     <div style={{ color: '#ef4444' }}>エラー: {cameraStatus.error}</div>
                   )}
-                  {videoRef.current && !videoRef.current.srcObject && (
+                  {!cameraStatus.hasSrcObject && (
                     <div style={{ color: '#ef4444' }}>⚠️ ストリームが設定されていません</div>
                   )}
                 </div>
