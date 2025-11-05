@@ -1,0 +1,96 @@
+.camera-monitor {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 16px;
+  border: 2px solid #e5e7eb;
+}
+
+.camera-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.camera-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.camera-toggle {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 2px solid #3b82f6;
+  background: white;
+  color: #3b82f6;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.camera-toggle.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.camera-view {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.camera-video {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+}
+
+.camera-canvas {
+  display: none;
+}
+
+.camera-status {
+  padding: 12px;
+  background: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e5e7eb;
+}
+
+.status-dot.active {
+  background: #22c55e;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.camera-placeholder {
+  padding: 40px 20px;
+  text-align: center;
+  color: #64748b;
+}
+
+.camera-placeholder p {
+  margin: 8px 0;
+}
+

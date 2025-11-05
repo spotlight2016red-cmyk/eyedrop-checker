@@ -4,6 +4,8 @@ import { startScheduler, requestPermission, showNotification } from './utils/not
 import { AvatarMascot } from './components/AvatarMascot.jsx'
 import { useAuth } from './contexts/AuthContext.jsx'
 import { Login } from './components/Login.jsx'
+import { CameraMonitor } from './components/CameraMonitor.jsx'
+import { FamilyNotification, notifyFamily } from './components/FamilyNotification.jsx'
 
 function todayKey() {
   const d = new Date();
@@ -332,6 +334,23 @@ function AppContent() {
           ))}
         </div>
         <p className="hint">※ 通知はブラウザの設定に依存します。PWA化で安定化可能。</p>
+      </section>
+
+      <FamilyNotification />
+
+      <section className="camera-section">
+        <CameraMonitor
+          onMotionDetected={() => {
+            console.log('動きが検出されました');
+          }}
+          onNoMotion={async () => {
+            const message = `${key}の目薬が使用されていません（5分以上動きが検出されませんでした）`;
+            await showNotification('目薬の使用を確認してください', { body: message });
+            if (user) {
+              await notifyFamily(user.uid, message);
+            }
+          }}
+        />
       </section>
 
       <footer className="foot">
