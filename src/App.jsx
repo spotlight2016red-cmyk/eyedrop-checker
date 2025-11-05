@@ -218,10 +218,24 @@ function AppContent() {
       }
     };
     
+    // フォーカス中で通知が表示されない場合のページ内バナー表示
+    const handleInAppNotification = (e) => {
+      console.log('[App] show-in-app-notificationイベント受信:', e.detail);
+      const { slot, date, title, body } = e.detail || {};
+      if (slot && date === key) {
+        const jp = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : '夜';
+        console.log('[App] ページ内バナーを表示:', slot);
+        setBanner({ text: `${title}\n${body}\n${jp}の目薬を済にしますか？`, slot });
+        setHighlightSlot(slot);
+      }
+    };
+    
     window.addEventListener('notification-clicked', handleNotificationClick);
+    window.addEventListener('show-in-app-notification', handleInAppNotification);
     
     return () => {
       window.removeEventListener('notification-clicked', handleNotificationClick);
+      window.removeEventListener('show-in-app-notification', handleInAppNotification);
     };
   }, [key]);
 
@@ -450,7 +464,13 @@ function AppContent() {
                     setTimeout(() => {
                       if (!notifiedShown) {
                         console.warn('[App] ⚠️ 通知が表示されていない可能性があります');
-                        alert('通知が表示されていない可能性があります。\n\n確認事項:\n1. ブラウザの通知設定を確認してください\n2. システムの通知設定を確認してください\n3. 別のタブやウィンドウを開いて、通知が表示されるか確認してください\n\nChrome: chrome://settings/content/notifications\n\n通知が表示されない場合、ページをリロードして再度試してください。');
+                        // フォーカス中の場合はページ内バナーを表示
+                        if (document.hasFocus()) {
+                          console.log('[App] ページ内バナーを表示します');
+                          setBanner({ text: 'テスト通知\n（フォーカス中のため通知が表示されない場合があります）', slot: 'morning' });
+                        } else {
+                          alert('通知が表示されていない可能性があります。\n\n確認事項:\n1. ブラウザの通知設定を確認してください\n2. システムの通知設定を確認してください\n3. 別のタブやウィンドウを開いて、通知が表示されるか確認してください\n\nChrome: chrome://settings/content/notifications\n\n通知が表示されない場合、ページをリロードして再度試してください。');
+                        }
                       }
                     }, 3000);
                   }

@@ -72,6 +72,19 @@ export async function showNotification(title, options = {}) {
           console.log('[NotifHelper] 1. 別のタブを開いて、そのタブで通知を試してください');
           console.log('[NotifHelper] 2. ウィンドウを最小化してから通知を試してください');
           console.log('[NotifHelper] 3. 通知センター（macOS右上、Windows右下）を確認してください');
+          
+          // フォーカス中で通知が表示されない場合、ページ内バナーを表示するイベントを発火
+          if (options.data && options.data.slot) {
+            console.log('[NotifHelper] ページ内バナー表示イベントを発火');
+            window.dispatchEvent(new CustomEvent('show-in-app-notification', {
+              detail: {
+                title,
+                body: options.body || '',
+                slot: options.data.slot,
+                date: options.data.date
+              }
+            }));
+          }
         }
       }, 5000);
       
