@@ -69,8 +69,12 @@ function AppContent() {
 
   // 家族通知のリアルタイム監視（自分宛の通知を受け取る）
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email) {
+      console.log('[App] 家族通知監視: ユーザーがログインしていません');
+      return;
+    }
 
+    console.log('[App] 家族通知監視開始:', user.email);
     const q = query(
       collection(db, 'notifications'),
       where('email', '==', user.email),
@@ -78,9 +82,11 @@ function AppContent() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('[App] 通知スナップショット更新:', snapshot.size, '件');
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const notif = change.doc.data();
+          console.log('[App] 新しい通知を受信:', notif);
           showNotification('家族からの通知', {
             body: notif.message,
             tag: `family-${change.doc.id}`,
@@ -88,9 +94,14 @@ function AppContent() {
           });
         }
       });
+    }, (error) => {
+      console.error('[App] 通知監視エラー:', error);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('[App] 家族通知監視を停止');
+      unsubscribe();
+    };
   }, [user]);
 
   // SW更新の検知

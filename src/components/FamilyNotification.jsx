@@ -165,8 +165,15 @@ service cloud.firestore {
             onClick={async () => {
               if (!user) return;
               const message = `${new Date().toLocaleDateString('ja-JP')}の目薬が使用されていません（テスト通知）`;
-              await notifyFamily(user.uid, message);
-              alert('家族にテスト通知を送信しました。家族メンバーがログインしているデバイスで確認してください。');
+              console.log('[FamilyNotification] テスト通知送信開始:', { userId: user.uid, email: user.email });
+              try {
+                await notifyFamily(user.uid, message);
+                console.log('[FamilyNotification] テスト通知送信完了');
+                alert(`家族にテスト通知を送信しました。\n\n送信先: 登録されている家族メンバー\n家族メンバーがログインしているデバイスで確認してください。`);
+              } catch (err) {
+                console.error('[FamilyNotification] テスト通知送信エラー:', err);
+                alert(`通知送信に失敗しました: ${err.message || err.code || '不明なエラー'}`);
+              }
             }}
             className="family-test-btn"
           >
@@ -188,12 +195,16 @@ export async function notifyFamily(userId, message) {
     );
     const snapshot = await getDocs(q);
     const familyEmails = snapshot.docs.map(doc => doc.data().email);
+    console.log('[notifyFamily] 家族メンバー:', familyEmails);
+
+    if (familyEmails.length === 0) {
+      console.warn('[notifyFamily] 家族メンバーが登録されていません');
+      return;
+    }
 
     // 各家族メンバーのユーザーIDを取得して通知を作成
     const notifications = [];
     for (const email of familyEmails) {
-      // メールアドレスでユーザーを検索（usersコレクションに保存されている場合）
-      // または、通知をメールアドレスベースで保存
       notifications.push({
         email: email,
         message: message,
@@ -205,10 +216,14 @@ export async function notifyFamily(userId, message) {
 
     // 通知を保存
     for (const notif of notifications) {
-      await addDoc(collection(db, 'notifications'), notif);
+      const docRef = await addDoc(collection(db, 'notifications'), notif);
+      console.log('[notifyFamily] 通知を保存:', { id: docRef.id, email: notif.email });
     }
+    
+    console.log('[notifyFamily] すべての通知を送信完了');
   } catch (err) {
     console.error('家族通知送信エラー:', err);
+    throw err;
   }
 }
 
