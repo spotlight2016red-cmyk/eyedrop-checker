@@ -1,0 +1,13 @@
+{
+  "name": "EyeDrop Checker",
+  "short_name": "EyeDrop",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "/vite.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
+
+
