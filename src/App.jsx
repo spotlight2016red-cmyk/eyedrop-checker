@@ -36,6 +36,7 @@ function App() {
       return { notifications: false, times: { morning: '08:00', noon: '12:00', night: '20:00' } };
     }
   });
+  const [banner, setBanner] = useState(null); // { text, slot }
 
   const key = useMemo(() => todayKey(), []);
   const day = data[key] ?? { morning: false, noon: false, night: false, note: '' };
@@ -54,6 +55,21 @@ function App() {
     const stop = startScheduler(() => data, () => settings);
     return () => stop && stop();
   }, [data, settings]);
+
+  // handle deep-link from notification: /?slot=...&date=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slot = params.get('slot');
+    const date = params.get('date');
+    if (slot && date) {
+      const jp = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : '夜';
+      setBanner({ text: `通知から開きました（${jp}）`, slot });
+      // 1回だけにするためURLをクリーンアップ
+      const url = new URL(window.location.href);
+      url.search = '';
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
 
   const toggle = (slotId) => {
     setData((prev) => ({
@@ -74,6 +90,21 @@ function App() {
       <div style={{ display:'flex', justifyContent:'center' }}>
         <AvatarMascot size={100} />
       </div>
+      {banner && (
+        <div className="banner">
+          {banner.text}
+          {banner.slot && (
+            <button
+              className="btn"
+              style={{ marginLeft: 8 }}
+              onClick={() => {
+                toggle(banner.slot);
+                setBanner(null);
+              }}
+            >{banner.slot === 'morning' ? '朝' : banner.slot === 'noon' ? '昼' : '夜'}を「済」にする</button>
+          )}
+        </div>
+      )}
       <h1 className="title">目薬チェック</h1>
       <p className="subtitle">{key} の記録</p>
 

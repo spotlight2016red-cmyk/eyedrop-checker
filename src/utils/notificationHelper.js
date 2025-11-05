@@ -59,7 +59,8 @@ export function startScheduler(getData, getSettings) {
           renotify: true,
           silent: false,
           badge: '/vite.svg',
-          icon: '/vite.svg'
+          icon: '/vite.svg',
+          data: { slot, date: todayKey }
         });
         // store last notified via localStorage (settings saver should pick up)
         try {
