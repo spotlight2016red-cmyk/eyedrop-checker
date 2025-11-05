@@ -155,6 +155,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           console.log('[CameraMonitor] メタデータ読み込み後、再生を開始');
           videoRef.current.play().then(() => {
             console.log('[CameraMonitor] 再生成功');
+            setCameraStatus(prev => ({ ...prev, paused: false }));
           }).catch(err => {
             console.error('[CameraMonitor] メタデータ読み込み後の再生エラー:', err);
           });
@@ -170,8 +171,11 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         }));
         // 再生を再試行
         if (videoRef.current && videoRef.current.paused) {
-          videoRef.current.play().catch(err => {
-            console.error('[CameraMonitor] 再生再試行エラー:', err);
+          videoRef.current.play().then(() => {
+            console.log('[CameraMonitor] oncanplay後の再生成功');
+            setCameraStatus(prev => ({ ...prev, paused: false }));
+          }).catch(err => {
+            console.error('[CameraMonitor] oncanplay後の再生エラー:', err);
           });
         }
       };
@@ -231,14 +235,28 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       // ストリームを設定（先に設定）
       setStream(mediaStream);
       
-      // 再生を開始
-      try {
-        await videoRef.current.play();
-        console.log('[CameraMonitor] 動画再生開始');
-      } catch (playError) {
-        console.error('[CameraMonitor] 動画再生エラー:', playError);
-        // 再生に失敗した場合でも、ストリームは設定されているので続行
-      }
+      // 再生を開始（複数回試行）
+      const tryPlay = async () => {
+        if (!videoRef.current) return;
+        
+        try {
+          await videoRef.current.play();
+          console.log('[CameraMonitor] 動画再生開始成功');
+          setCameraStatus(prev => ({ ...prev, paused: false }));
+        } catch (playError) {
+          console.error('[CameraMonitor] 動画再生エラー:', playError);
+          // 再生に失敗した場合、少し待ってから再試行
+          setTimeout(() => {
+            if (videoRef.current && videoRef.current.paused) {
+              console.log('[CameraMonitor] 再生再試行');
+              tryPlay();
+            }
+          }, 1000);
+        }
+      };
+      
+      // すぐに再生を試行
+      tryPlay();
       
       // 少し待ってから動き検出を開始（カメラが安定するまで）
       setTimeout(() => {
