@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, where, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, where, getDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -218,25 +218,59 @@ export async function notifyFamily(userId, message, userEmail = null) {
       return;
     }
 
-    // 各メンバーに通知を作成
+    // メッセージから日付を抽出（例：「2024/1/15の目薬が...」→「2024/1/15」）
+    const dateMatch = message.match(/^(\d{4}\/\d{1,2}\/\d{1,2})/);
+    const dateKey = dateMatch ? dateMatch[1] : null;
+    
+    // 今日の日付の通知が既に存在するかチェック（重複防止）
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    
+    // 各メンバーに通知を作成（重複チェック）
     const notifications = [];
     for (const email of targetEmails) {
+      // 同じメールアドレスで、今日の日付の通知が既に存在するかチェック
+      const existingQuery = query(
+        collection(db, 'notifications'),
+        where('email', '==', email),
+        where('type', '==', 'camera-alert'),
+        where('read', '==', false),
+        where('timestamp', '>=', Timestamp.fromDate(todayStart)),
+        where('timestamp', '<', Timestamp.fromDate(todayEnd))
+      );
+      
+      const existingSnapshot = await getDocs(existingQuery);
+      
+      // 既に通知が存在する場合はスキップ
+      if (existingSnapshot.size > 0) {
+        console.log(`[notifyFamily] ${email}への通知は既に存在するためスキップ`);
+        continue;
+      }
+      
       notifications.push({
         email: email,
         message: message,
         timestamp: new Date(),
         read: false,
-        type: 'camera-alert'
+        type: 'camera-alert',
+        dateKey: dateKey // 日付キーを保存（将来の検索用）
       });
     }
 
     // 通知を保存
+    let savedCount = 0;
     for (const notif of notifications) {
-      const docRef = await addDoc(collection(db, 'notifications'), notif);
-      console.log('[notifyFamily] 通知を保存:', { id: docRef.id, email: notif.email });
+      try {
+        const docRef = await addDoc(collection(db, 'notifications'), notif);
+        console.log('[notifyFamily] 通知を保存:', { id: docRef.id, email: notif.email });
+        savedCount++;
+      } catch (err) {
+        console.error(`[notifyFamily] 通知保存エラー (${notif.email}):`, err);
+      }
     }
     
-    console.log('[notifyFamily] すべての通知を送信完了:', targetEmails.length, '件');
+    console.log('[notifyFamily] 通知送信完了:', savedCount, '件（重複分を除く）');
   } catch (err) {
     console.error('家族通知送信エラー:', err);
     throw err;
