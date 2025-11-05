@@ -23,13 +23,20 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       return;
     }
     
-    const interval = setInterval(() => {
+    // 即座に計算して表示
+    const updateRemainingTime = () => {
       if (noMotionStartTime) {
         const elapsed = Date.now() - noMotionStartTime;
         const remaining = Math.max(0, NO_MOTION_THRESHOLD - elapsed);
         setRemainingTime(remaining);
       }
-    }, 1000);
+    };
+    
+    // 初回計算
+    updateRemainingTime();
+    
+    // 1秒ごとに更新
+    const interval = setInterval(updateRemainingTime, 1000);
     
     return () => clearInterval(interval);
   }, [isActive, noMotionStartTime, NO_MOTION_THRESHOLD]);
@@ -43,7 +50,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     return () => {
       stopMonitoring();
     };
-  }, [isActive]);
+  }, [isActive, testMode]);
 
   const startMonitoring = async () => {
     try {
@@ -123,16 +130,29 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       } else {
         // 動きが検出されない場合、タイマーを開始
         const now = Date.now();
-        if (!noMotionStartTime) {
-          setNoMotionStartTime(now);
+        
+        // 最初のフレームは除外（lastFrameRefがnullの場合）
+        if (!lastFrameRef.current) {
+          animationFrameRef.current = requestAnimationFrame(detectMotion);
+          return;
         }
         
+        // 動きがない状態が始まった時刻を記録
+        if (!noMotionStartTime) {
+          setNoMotionStartTime(now);
+          // 即座に残り時間を設定
+          setRemainingTime(NO_MOTION_THRESHOLD);
+          console.log('[CameraMonitor] 動きなしタイマー開始, 残り時間:', NO_MOTION_THRESHOLD);
+        }
+        
+        // タイマーが設定されていない場合、設定する
         if (!noMotionTimer && noMotionStartTime) {
           const elapsed = now - noMotionStartTime;
           const remaining = NO_MOTION_THRESHOLD - elapsed;
           
           if (remaining > 0) {
             const timer = setTimeout(() => {
+              console.log('[CameraMonitor] 動きなしタイマー完了');
               if (onNoMotion) onNoMotion();
               setNoMotionTimer(null);
               setNoMotionStartTime(null);
@@ -141,6 +161,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             setNoMotionTimer(timer);
           } else {
             // 既に閾値を超えている場合
+            console.log('[CameraMonitor] 既に閾値を超えています');
             if (onNoMotion) onNoMotion();
             setNoMotionStartTime(null);
             setRemainingTime(null);
