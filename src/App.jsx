@@ -385,6 +385,13 @@ function AppContent() {
               }
             }}
           >テスト通知</button>
+          <button
+            className="btn"
+            onClick={() => {
+              setUpdateAvailable(true);
+            }}
+            style={{ fontSize: '12px', padding: '6px 12px', marginLeft: '8px' }}
+          >更新バナーテスト</button>
         </div>
         <div className="time-grid">
           {SLOTS.map(s => (
