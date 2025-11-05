@@ -247,26 +247,25 @@ function AppContent() {
           <button
             className="banner-btn"
             onClick={async () => {
-              // SWの更新を待ってからリロード
+              // より安全な更新方法：SWを無効化してからリロード
               if ('serviceWorker' in navigator) {
                 try {
                   const registration = await navigator.serviceWorker.getRegistration();
-                  if (registration && registration.waiting) {
-                    // 新しいSWが待機中なら、アクティベートしてからリロード
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  if (registration) {
+                    // すべてのSWを登録解除
+                    await registration.unregister();
+                    // キャッシュをクリア
+                    if ('caches' in window) {
+                      const cacheNames = await caches.keys();
+                      await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    }
                   }
-                  // 少し待ってからリロード
-                  setTimeout(() => {
-                    window.location.reload(true);
-                  }, 500);
                 } catch (err) {
                   console.error('SW更新エラー:', err);
-                  // エラーでもリロード
-                  window.location.reload(true);
                 }
-              } else {
-                window.location.reload(true);
               }
+              // 強制リロード（キャッシュを無視）
+              window.location.href = window.location.href.split('?')[0] + '?reload=' + Date.now();
             }}
             style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}
           >アプリを更新</button>
