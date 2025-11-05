@@ -35,22 +35,45 @@ export async function showNotification(title, options = {}) {
     // PCまたはSWがない場合、直接Notification APIを使用
     if ('Notification' in window && Notification.permission === 'granted') {
       console.log('[NotifHelper] Using Notification API directly');
+      
+      // Chromeではフォーカス中のページでは通知が表示されないことがあるため、警告を追加
+      const isPageFocused = document.hasFocus();
+      if (isPageFocused) {
+        console.warn('[NotifHelper] ⚠️ ページがフォーカス中です。Chromeではフォーカス中のページでは通知が表示されない場合があります。');
+        console.log('[NotifHelper] ヒント: 別のタブを開くか、ウィンドウを最小化してから通知を確認してください。');
+      }
+      
       const result = new Notification(title, options);
       console.log('[NotifHelper] 直接通知送信完了:', result);
       
+      // 通知が実際に表示されたか確認（5秒後にチェック）
+      let notificationShown = false;
+      
       // 通知の表示イベントを監視
       result.onshow = () => {
-        console.log('[NotifHelper] 通知が表示されました:', title);
+        notificationShown = true;
+        console.log('[NotifHelper] ✅ 通知が表示されました:', title);
       };
       
       result.onerror = (e) => {
-        console.error('[NotifHelper] 通知エラー:', e);
-        alert('通知の表示に失敗しました。ブラウザの通知設定を確認してください。');
+        console.error('[NotifHelper] ❌ 通知エラー:', e);
+        alert('通知の表示に失敗しました。ブラウザの通知設定を確認してください。\n\nChrome: chrome://settings/content/notifications');
       };
       
       result.onclose = () => {
         console.log('[NotifHelper] 通知が閉じられました');
       };
+      
+      setTimeout(() => {
+        if (!notificationShown && isPageFocused) {
+          console.warn('[NotifHelper] ⚠️ 通知が表示されていない可能性があります。');
+          console.log('[NotifHelper] 原因: Chromeではフォーカス中のページでは通知が表示されないことがあります。');
+          console.log('[NotifHelper] 解決方法:');
+          console.log('[NotifHelper] 1. 別のタブを開いて、そのタブで通知を試してください');
+          console.log('[NotifHelper] 2. ウィンドウを最小化してから通知を試してください');
+          console.log('[NotifHelper] 3. 通知センター（macOS右上、Windows右下）を確認してください');
+        }
+      }, 5000);
       
       // 通知クリック時の処理（直接APIの場合）
       if (options.data) {
