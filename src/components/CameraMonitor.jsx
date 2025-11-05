@@ -12,7 +12,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [noMotionStartTime, setNoMotionStartTime] = useState(null);
   const [remainingTime, setRemainingTime] = useState(null);
   const lastFrameRef = useRef(null);
-  const animationFrameRef = useRef(null);
+  const intervalRef = useRef(null);
 
   const NO_MOTION_THRESHOLD = testMode ? 30 * 1000 : 5 * 60 * 1000; // テストモード: 30秒、通常: 5分（ミリ秒）
   
@@ -52,6 +52,36 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     };
   }, [isActive, testMode]);
 
+  // バックグラウンドになったときにタイマーを開始
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && !noMotionStartTime) {
+        // バックグラウンドになったとき、タイマーが開始されていない場合は開始
+        const now = Date.now();
+        setNoMotionStartTime(now);
+        setRemainingTime(NO_MOTION_THRESHOLD);
+        console.log('[CameraMonitor] バックグラウンドでタイマー開始');
+        
+        // タイマーを設定
+        const timer = setTimeout(() => {
+          console.log('[CameraMonitor] バックグラウンドでタイマー完了');
+          if (onNoMotion) onNoMotion();
+          setNoMotionTimer(null);
+          setNoMotionStartTime(null);
+          setRemainingTime(null);
+        }, NO_MOTION_THRESHOLD);
+        setNoMotionTimer(timer);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isActive, noMotionStartTime, NO_MOTION_THRESHOLD]);
+
   const startMonitoring = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -75,8 +105,9 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
     if (noMotionTimer) {
       clearTimeout(noMotionTimer);
@@ -95,20 +126,18 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     if (!video || !canvas) return;
 
     const ctx = canvas.getContext('2d');
-    let lastTime = Date.now();
 
+    // setIntervalを使用してバックグラウンドでも動き検出を続ける
     const detectMotion = () => {
-      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        animationFrameRef.current = requestAnimationFrame(detectMotion);
+      // ページが非表示の場合は、動き検出はできないがタイマーは継続
+      if (document.hidden) {
+        console.log('[CameraMonitor] ページが非表示のため動き検出をスキップ（タイマーは継続）');
         return;
       }
 
-      const currentTime = Date.now();
-      if (currentTime - lastTime < 1000) { // 1秒ごとにチェック
-        animationFrameRef.current = requestAnimationFrame(detectMotion);
+      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
         return;
       }
-      lastTime = currentTime;
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -168,10 +197,12 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           }
         }
       }
-
-      animationFrameRef.current = requestAnimationFrame(detectMotion);
     };
 
+    // 1秒ごとに動き検出を実行（バックグラウンドでもタイマーは継続）
+    intervalRef.current = setInterval(detectMotion, 1000);
+    
+    // 初回実行
     detectMotion();
   };
 
