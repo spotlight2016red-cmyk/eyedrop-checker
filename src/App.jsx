@@ -205,6 +205,26 @@ function AppContent() {
     }
   }, [key]);
 
+  // notification-clickedイベントをリッスン（直接Notification APIからの通知クリック）
+  useEffect(() => {
+    const handleNotificationClick = (e) => {
+      console.log('[App] notification-clickedイベント受信:', e.detail);
+      const { slot, date } = e.detail || {};
+      if (slot && date === key) {
+        const jp = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : '夜';
+        console.log('[App] バナーを表示:', slot);
+        setBanner({ text: `通知から開きました\n${jp}の目薬を済にしますか？`, slot });
+        setHighlightSlot(slot);
+      }
+    };
+    
+    window.addEventListener('notification-clicked', handleNotificationClick);
+    
+    return () => {
+      window.removeEventListener('notification-clicked', handleNotificationClick);
+    };
+  }, [key]);
+
   const toggle = (slotId) => {
     setData((prev) => ({
       ...prev,
@@ -419,13 +439,43 @@ function AppContent() {
                   console.log('[App] 通知許可OK、通知を送信');
                   const result = await showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
                   console.log('[App] 通知送信結果:', result);
+                  
+                  // 通知が表示されたかチェック（3秒後に確認）
+                  let notifiedShown = false;
+                  if (result) {
+                    result.onshow = () => {
+                      notifiedShown = true;
+                      console.log('[App] ✅ 通知が表示されました！');
+                    };
+                    setTimeout(() => {
+                      if (!notifiedShown) {
+                        console.warn('[App] ⚠️ 通知が表示されていない可能性があります');
+                        alert('通知が表示されていない可能性があります。\n\n確認事項:\n1. ブラウザの通知設定を確認してください\n2. システムの通知設定を確認してください\n3. 別のタブやウィンドウを開いて、通知が表示されるか確認してください\n\nChrome: chrome://settings/content/notifications\n\n通知が表示されない場合、ページをリロードして再度試してください。');
+                      }
+                    }, 3000);
+                  }
                 } else if (p === 'denied') {
-                  alert('通知が拒否されました。ブラウザの設定から通知を許可してください。');
+                  alert('通知が拒否されました。ブラウザの設定から通知を許可してください。\n\nChrome: chrome://settings/content/notifications');
                 }
               } else {
                 console.log('[App] 通知許可済み、通知を送信');
                 const result = await showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
                 console.log('[App] 通知送信結果:', result);
+                
+                // 通知が表示されたかチェック（3秒後に確認）
+                let notifiedShown = false;
+                if (result) {
+                  result.onshow = () => {
+                    notifiedShown = true;
+                    console.log('[App] ✅ 通知が表示されました！');
+                  };
+                  setTimeout(() => {
+                    if (!notifiedShown) {
+                      console.warn('[App] ⚠️ 通知が表示されていない可能性があります');
+                      alert('通知が表示されていない可能性があります。\n\n確認事項:\n1. ブラウザの通知設定を確認してください\n2. システムの通知設定を確認してください\n3. 別のタブやウィンドウを開いて、通知が表示されるか確認してください\n\nChrome: chrome://settings/content/notifications\n\n通知が表示されない場合、ページをリロードして再度試してください。');
+                    }
+                  }, 3000);
+                }
               }
             }}
           >テスト通知</button>

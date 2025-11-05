@@ -38,18 +38,58 @@ export async function showNotification(title, options = {}) {
       const result = new Notification(title, options);
       console.log('[NotifHelper] 直接通知送信完了:', result);
       
+      // 通知の表示イベントを監視
+      result.onshow = () => {
+        console.log('[NotifHelper] 通知が表示されました:', title);
+      };
+      
+      result.onerror = (e) => {
+        console.error('[NotifHelper] 通知エラー:', e);
+        alert('通知の表示に失敗しました。ブラウザの通知設定を確認してください。');
+      };
+      
+      result.onclose = () => {
+        console.log('[NotifHelper] 通知が閉じられました');
+      };
+      
       // 通知クリック時の処理（直接APIの場合）
       if (options.data) {
-        result.onclick = () => {
+        result.onclick = (e) => {
           console.log('[NotifHelper] 通知クリック:', options.data);
+          e.preventDefault();
           result.close();
+          
+          // ウィンドウをフォーカス
           window.focus();
-          // URLパラメータでバナーを表示
+          
+          // localStorageにフラグを設定してバナーを表示
           if (options.data.slot && options.data.date) {
-            const url = new URL(window.location.href);
-            url.searchParams.set('slot', options.data.slot);
-            url.searchParams.set('date', options.data.date);
-            window.location.href = url.toString();
+            try {
+              const flagData = { slot: options.data.slot, date: options.data.date };
+              localStorage.setItem('eyedrop-checker:notif-flag', JSON.stringify(flagData));
+              console.log('[NotifHelper] localStorageフラグを設定:', flagData);
+              
+              // イベントを発火してApp.jsxに通知
+              window.dispatchEvent(new CustomEvent('notification-clicked', { detail: flagData }));
+              
+              // URLパラメータも設定（バックアップ）
+              const url = new URL(window.location.href);
+              url.searchParams.set('slot', options.data.slot);
+              url.searchParams.set('date', options.data.date);
+              window.history.replaceState({}, '', url);
+              
+              // 少し待ってからリロードしてバナーを表示
+              setTimeout(() => {
+                window.location.reload();
+              }, 100);
+            } catch (err) {
+              console.error('[NotifHelper] フラグ設定エラー:', err);
+              // エラー時はURLパラメータのみ
+              const url = new URL(window.location.href);
+              url.searchParams.set('slot', options.data.slot);
+              url.searchParams.set('date', options.data.date);
+              window.location.href = url.toString();
+            }
           }
         };
       }
@@ -57,6 +97,7 @@ export async function showNotification(title, options = {}) {
       return result;
     } else {
       console.warn('[NotifHelper] 通知が送れません。許可状態:', Notification.permission);
+      alert(`通知が送れません。許可状態: ${Notification.permission}\n\nブラウザの設定から通知を許可してください。`);
     }
   } catch (e) {
     console.error('[NotifHelper] Error showing notification:', e);
