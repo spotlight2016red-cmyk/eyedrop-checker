@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { startScheduler, requestPermission, showNotification } from './utils/notificationHelper.js'
 import { AvatarMascot } from './components/AvatarMascot.jsx'
-
-const STORAGE_KEY = 'eyedrop-checker:v1';
+import { useAuth } from './contexts/AuthContext.jsx'
+import { Login } from './components/Login.jsx'
 
 function todayKey() {
   const d = new Date();
@@ -19,10 +19,14 @@ const SLOTS = [
   { id: 'night', label: '夜' },
 ];
 
-function App() {
+function AppContent() {
+  const { user, logout } = useAuth();
+  const storageKey = `eyedrop-checker:v1:${user?.uid || 'guest'}`;
+  const settingsKey = `eyedrop-checker:settings:${user?.uid || 'guest'}`;
+  
   const [data, setData] = useState(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -30,24 +34,25 @@ function App() {
   });
   const [settings, setSettings] = useState(() => {
     try {
-      const raw = localStorage.getItem('eyedrop-checker:settings');
+      const raw = localStorage.getItem(settingsKey);
       return raw ? JSON.parse(raw) : { notifications: false, times: { morning: '08:00', noon: '12:00', night: '20:00' } };
     } catch {
       return { notifications: false, times: { morning: '08:00', noon: '12:00', night: '20:00' } };
     }
   });
   const [banner, setBanner] = useState(null); // { text, slot }
+  const [highlightSlot, setHighlightSlot] = useState(null); // 'morning' | 'noon' | 'night' | null
 
   const key = useMemo(() => todayKey(), []);
   const day = data[key] ?? { morning: false, noon: false, night: false, note: '' };
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  }, [data, storageKey]);
 
   useEffect(() => {
-    localStorage.setItem('eyedrop-checker:settings', JSON.stringify(settings));
-  }, [settings]);
+    localStorage.setItem(settingsKey, JSON.stringify(settings));
+  }, [settings, settingsKey]);
 
   // start local scheduler
   useEffect(() => {
@@ -63,7 +68,8 @@ function App() {
     const date = params.get('date');
     if (slot && date) {
       const jp = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : '夜';
-      setBanner({ text: `通知から開きました（${jp}）`, slot });
+      setBanner({ text: `通知から開きました\n${jp}の目薬を済にしますか？`, slot });
+      setHighlightSlot(slot);
       // 1回だけにするためURLをクリーンアップ
       const url = new URL(window.location.href);
       url.search = '';
@@ -78,7 +84,8 @@ function App() {
         if (data.type === 'from-notification' && data.slot) {
           console.log('[App] Showing banner from notification:', data.slot);
           const jp2 = data.slot === 'morning' ? '朝' : data.slot === 'noon' ? '昼' : '夜';
-          setBanner({ text: `通知から開きました（${jp2}）`, slot: data.slot });
+          setBanner({ text: `通知から開きました\n${jp2}の目薬を済にしますか？`, slot: data.slot });
+          setHighlightSlot(data.slot);
         }
         // localStorageフラグを立てる指示
         if (data.type === 'set-notif-flag' && data.slot && data.date) {
@@ -100,7 +107,8 @@ function App() {
             if (parsed.slot && parsed.date === key) {
               const jp3 = parsed.slot === 'morning' ? '朝' : parsed.slot === 'noon' ? '昼' : '夜';
               console.log('[App] Showing banner from flag:', parsed.slot);
-              setBanner({ text: `通知から開きました（${jp3}）`, slot: parsed.slot });
+              setBanner({ text: `通知から開きました\n${jp3}の目薬を済にしますか？`, slot: parsed.slot });
+              setHighlightSlot(parsed.slot);
               localStorage.removeItem('eyedrop-checker:notif-flag');
             }
           }
@@ -151,14 +159,14 @@ function App() {
       </div>
       {banner && (
         <div className="banner">
-          {banner.text}
+          <div style={{ whiteSpace: 'pre-line' }}>{banner.text}</div>
           {banner.slot && (
             <button
-              className="btn"
-              style={{ marginLeft: 8 }}
+              className="banner-btn"
               onClick={() => {
                 toggle(banner.slot);
                 setBanner(null);
+                setHighlightSlot(null);
               }}
             >{banner.slot === 'morning' ? '朝' : banner.slot === 'noon' ? '昼' : '夜'}を「済」にする</button>
           )}
@@ -179,8 +187,11 @@ function App() {
         {SLOTS.map((slot) => (
           <button
             key={slot.id}
-            className={`slot ${day[slot.id] ? 'on' : ''}`}
-            onClick={() => toggle(slot.id)}
+            className={`slot ${day[slot.id] ? 'on' : ''} ${highlightSlot === slot.id ? 'highlight' : ''}`}
+            onClick={() => {
+              toggle(slot.id);
+              if (highlightSlot === slot.id) setHighlightSlot(null);
+            }}
           >
             <span className="slot-label">{slot.label}</span>
             <span className="slot-state">{day[slot.id] ? '済' : '未'}</span>
@@ -323,9 +334,36 @@ function App() {
         <p className="hint">※ 通知はブラウザの設定に依存します。PWA化で安定化可能。</p>
       </section>
 
-      <footer className="foot">家族みんなで健康に。忘れない工夫を。</footer>
+      <footer className="foot">
+        家族みんなで健康に。忘れない工夫を。
+        <div style={{ marginTop: '12px' }}>
+          <button
+            onClick={logout}
+            className="btn"
+            style={{ fontSize: '14px', padding: '8px 16px' }}
+          >
+            ログアウト
+          </button>
+        </div>
+      </footer>
     </div>
   )
 }
 
-export default App
+export default function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div>読み込み中...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return <AppContent />;
+}
