@@ -451,12 +451,18 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             console.log('[CameraMonitor] 動きなしタイマー完了（残り時間0）');
             noMotionNotifiedRef.current = true; // 通知フラグを設定
             if (onNoMotion) onNoMotion();
-            // タイマーはクリアしない（次の動き検出まで待つ）
+            // 通知を送った後は、動きが検出されるまで待つ（remaining === 0の時は通知を送らない）
+            return; // 早期リターンで以降の処理をスキップ
+          }
+          
+          // 既に通知を送った場合は、動きが検出されるまで待つ（remaining === 0の時は処理をスキップ）
+          if (remaining === 0 && noMotionNotifiedRef.current) {
+            return; // 早期リターンで以降の処理をスキップ
           }
         }
         
         // タイマーが設定されていない場合、設定する（remaining > 0の場合のみ）
-        if (!noMotionTimer && noMotionStartTimeRef.current) {
+        if (!noMotionTimer && noMotionStartTimeRef.current && !noMotionNotifiedRef.current) {
           const elapsed = now - noMotionStartTimeRef.current;
           const remaining = NO_MOTION_THRESHOLD - elapsed;
           
@@ -472,7 +478,6 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             }, remaining);
             setNoMotionTimer(timer);
           }
-          // remaining === 0の場合は上記の処理で通知を送信済み
         }
       }
     };

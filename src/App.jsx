@@ -89,20 +89,38 @@ function AppContent() {
           const notif = change.doc.data();
           console.log('[App] 新しい通知を受信:', notif);
           
-          // 通知を送信
-          const notificationResult = showNotification('家族からの通知', {
+          // 通知を送信（カメラ監視からの通知か、家族からの通知かを判定）
+          const notificationTitle = notif.type === 'camera-alert' 
+            ? '目薬の使用を確認してください' 
+            : '家族からの通知';
+          const notificationTag = notif.type === 'camera-alert'
+            ? `camera-no-motion-${key}`
+            : `family-${change.doc.id}`;
+          const notificationData = notif.type === 'camera-alert'
+            ? { type: 'camera-no-motion', date: key, message: notif.message }
+            : { type: 'family-notification', id: change.doc.id };
+          
+          const notificationResult = showNotification(notificationTitle, {
             body: notif.message,
-            tag: `family-${change.doc.id}`,
-            data: { type: 'family-notification', id: change.doc.id }
+            tag: notificationTag,
+            data: notificationData
           });
           
           // フォーカス中の場合は即座にページ内バナーも表示（スマホでも確実に表示）
           if (document.hasFocus()) {
-            console.log('[App] 家族通知: フォーカス中のためページ内バナーを表示');
-            setBanner({ 
-              text: `家族からの通知\n${notif.message}`,
-              slot: null // 家族通知はslotがない
-            });
+            if (notif.type === 'camera-alert') {
+              console.log('[App] カメラ監視通知: フォーカス中のためページ内バナーを表示');
+              setBanner({ 
+                text: notif.message,
+                slot: null // カメラ監視通知はslotがない
+              });
+            } else {
+              console.log('[App] 家族通知: フォーカス中のためページ内バナーを表示');
+              setBanner({ 
+                text: `家族からの通知\n${notif.message}`,
+                slot: null // 家族通知はslotがない
+              });
+            }
             
             // 通知が表示された場合はバナーを閉じる（ただし、Service Worker経由の場合はonshowが発火しない可能性がある）
             setTimeout(async () => {
@@ -606,18 +624,9 @@ function AppContent() {
           }}
           onNoMotion={async () => {
             const message = `${key}の目薬が使用されていません（5分以上動きが検出されませんでした）`;
-            await showNotification('目薬の使用を確認してください', { 
-              body: message,
-              data: { 
-                type: 'camera-no-motion',
-                date: key,
-                message: message
-              },
-              tag: `camera-no-motion-${key}`, // 同じ日の通知は1つだけにする
-              requireInteraction: false
-            });
+            // Firestore経由のみで通知を送信（onSnapshotで統一管理）
+            // これにより、カメラ側、本人、家族すべてのデバイスで同じ通知が1回だけ送られる
             if (user) {
-              // 本人と家族の両方に通知を送信（Firestore経由）
               await notifyFamily(user.uid, message, user.email);
             }
           }}
