@@ -12,6 +12,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [noMotionStartTime, setNoMotionStartTime] = useState(null);
   const [remainingTime, setRemainingTime] = useState(null);
   const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
+  const [patternDetected, setPatternDetected] = useState(false); // パターン検出の表示用
   const lastFrameRef = useRef(null);
   const intervalRef = useRef(null);
   const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
@@ -41,7 +42,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     const interval = setInterval(updateRemainingTime, 1000);
     
     return () => clearInterval(interval);
-  }, [isActive, noMotionStartTime, NO_MOTION_THRESHOLD]);
+  }, [isActive, noMotionStartTime, testMode]); // testModeが変わるとNO_MOTION_THRESHOLDも変わるため追加
 
   useEffect(() => {
     if (isActive && videoRef.current) {
@@ -310,6 +311,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     setNoMotionStartTime(null);
     setRemainingTime(null);
     setCameraStatus({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
+    setPatternDetected(false); // パターン検出表示をリセット
     motionHistoryRef.current = []; // 動きの履歴をクリア
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -356,9 +358,15 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         
         if (isEyedropPattern) {
           // 目薬をさす動作パターンを検出した場合、タイマーをリセット
-          console.log('[CameraMonitor] 目薬をさす動作を検出、タイマーをリセット');
+          console.log('[CameraMonitor] ✅ 目薬をさす動作パターンを検出、タイマーをリセット');
           setMotionCount(prev => prev + 1);
           if (onMotionDetected) onMotionDetected();
+          
+          // UIにパターン検出を表示（3秒間）
+          setPatternDetected(true);
+          setTimeout(() => {
+            setPatternDetected(false);
+          }, 3000);
           
           // タイマーをリセット
           if (noMotionTimer) {
@@ -387,10 +395,10 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         
         // 動きがない状態が始まった時刻を記録
         if (!noMotionStartTime) {
-          setNoMotionStartTime(now);
-          // 即座に残り時間を設定
-          setRemainingTime(NO_MOTION_THRESHOLD);
           console.log('[CameraMonitor] 動きなしタイマー開始, 残り時間:', NO_MOTION_THRESHOLD);
+          setNoMotionStartTime(now);
+          // 即座に残り時間を設定（useEffectで更新されるが、即座に表示するため）
+          setRemainingTime(NO_MOTION_THRESHOLD);
         }
         
         // タイマーが設定されていない場合、設定する
@@ -526,6 +534,26 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
 
       {isActive && (
         <div className="camera-view">
+          {patternDetected && (
+            <div style={{
+              position: 'absolute',
+              top: '10px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#fff',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              zIndex: 20,
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+              animation: 'fadeInOut 3s ease-in-out',
+              whiteSpace: 'nowrap'
+            }}>
+              ✅ 目薬をさす動作を検出しました！
+            </div>
+          )}
           <video
             ref={videoRef}
             autoPlay
