@@ -44,6 +44,14 @@ export function FamilyNotification() {
     e.preventDefault();
     if (!user || !email) return;
     setLoading(true);
+    setFirestoreError(null);
+    
+    // タイムアウト設定（10秒）
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setFirestoreError('追加に時間がかかっています。Firestoreが正しく設定されているか確認してください。');
+    }, 10000);
+    
     try {
       // メールアドレスからユーザーIDを取得（ユーザーが既に登録済みの場合）
       const auth = getAuth();
@@ -53,11 +61,19 @@ export function FamilyNotification() {
         email: email.trim(),
         createdAt: new Date()
       });
+      clearTimeout(timeout);
       setEmail('');
       loadFamilyMembers();
     } catch (err) {
+      clearTimeout(timeout);
       console.error('家族メンバー追加エラー:', err);
-      alert('追加に失敗しました');
+      if (err.code === 'permission-denied') {
+        setFirestoreError('Firestoreのセキュリティルールが設定されていません。Firebase Consoleでルールを確認してください。');
+      } else if (err.code === 'unavailable' || err.message?.includes('Failed to get document')) {
+        setFirestoreError('Firestoreが利用できません。Firebase ConsoleでFirestore Databaseを作成してください。');
+      } else {
+        setFirestoreError(`追加に失敗しました: ${err.message || err.code || '不明なエラー'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -84,6 +100,27 @@ export function FamilyNotification() {
       {firestoreError && (
         <div className="family-error">
           {firestoreError}
+          <div style={{ marginTop: '8px', fontSize: '12px' }}>
+            <p>解決方法:</p>
+            <ol style={{ margin: '4px 0', paddingLeft: '20px' }}>
+              <li>Firebase Consoleを開く</li>
+              <li>「Firestore Database」→「ルール」タブ</li>
+              <li>以下のルールをコピー＆ペーストして「公開」をクリック</li>
+            </ol>
+            <pre style={{ background: '#f3f4f6', padding: '8px', borderRadius: '4px', fontSize: '11px', overflow: 'auto' }}>
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /familyMembers/{document} {
+      allow read, write: if request.auth != null;
+    }
+    match /notifications/{document} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}`}
+            </pre>
+          </div>
         </div>
       )}
 
