@@ -87,11 +87,38 @@ function AppContent() {
         if (change.type === 'added') {
           const notif = change.doc.data();
           console.log('[App] 新しい通知を受信:', notif);
-          showNotification('家族からの通知', {
+          
+          // 通知を送信
+          const notificationResult = showNotification('家族からの通知', {
             body: notif.message,
             tag: `family-${change.doc.id}`,
             data: { type: 'family-notification', id: change.doc.id }
           });
+          
+          // フォーカス中の場合は即座にページ内バナーも表示（スマホでも確実に表示）
+          if (document.hasFocus()) {
+            console.log('[App] 家族通知: フォーカス中のためページ内バナーを表示');
+            setBanner({ 
+              text: `家族からの通知\n${notif.message}`,
+              slot: null // 家族通知はslotがない
+            });
+            
+            // 通知が表示された場合はバナーを閉じる（ただし、Service Worker経由の場合はonshowが発火しない可能性がある）
+            setTimeout(async () => {
+              try {
+                const result = await notificationResult;
+                if (result) {
+                  result.onshow = () => {
+                    console.log('[App] 家族通知: 通知が表示された');
+                    // 通知が表示された場合はバナーを閉じる（ユーザーが既に通知を見た）
+                    // ただし、フォーカス中のページでは通知が表示されない場合が多いので、バナーは残す
+                  };
+                }
+              } catch (e) {
+                console.error('[App] 家族通知: 通知結果の取得エラー', e);
+              }
+            }, 100);
+          }
         }
       });
     }, (error) => {
@@ -230,12 +257,24 @@ function AppContent() {
       }
     };
     
+    // 家族通知のページ内バナー表示（showNotification関数から発火）
+    const handleFamilyNotification = (e) => {
+      console.log('[App] show-family-notificationイベント受信:', e.detail);
+      const { title, body } = e.detail || {};
+      if (title && body) {
+        console.log('[App] 家族通知のページ内バナーを表示');
+        setBanner({ text: `${title}\n${body}`, slot: null });
+      }
+    };
+    
     window.addEventListener('notification-clicked', handleNotificationClick);
     window.addEventListener('show-in-app-notification', handleInAppNotification);
+    window.addEventListener('show-family-notification', handleFamilyNotification);
     
     return () => {
       window.removeEventListener('notification-clicked', handleNotificationClick);
       window.removeEventListener('show-in-app-notification', handleInAppNotification);
+      window.removeEventListener('show-family-notification', handleFamilyNotification);
     };
   }, [key]);
 
@@ -262,7 +301,7 @@ function AppContent() {
       {banner && (
         <div className="banner">
           <div style={{ whiteSpace: 'pre-line' }}>{banner.text}</div>
-          {banner.slot && (
+          {banner.slot ? (
             <button
               className="banner-btn"
               onClick={() => {
@@ -271,6 +310,15 @@ function AppContent() {
                 setHighlightSlot(null);
               }}
             >{banner.slot === 'morning' ? '朝' : banner.slot === 'noon' ? '昼' : '夜'}を「済」にする</button>
+          ) : (
+            <button
+              className="banner-btn"
+              onClick={() => {
+                setBanner(null);
+                setHighlightSlot(null);
+              }}
+              style={{ background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)' }}
+            >閉じる</button>
           )}
         </div>
       )}

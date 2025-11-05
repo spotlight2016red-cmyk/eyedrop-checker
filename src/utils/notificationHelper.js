@@ -74,16 +74,28 @@ export async function showNotification(title, options = {}) {
           console.log('[NotifHelper] 3. 通知センター（macOS右上、Windows右下）を確認してください');
           
           // フォーカス中で通知が表示されない場合、ページ内バナーを表示するイベントを発火
-          if (options.data && options.data.slot) {
-            console.log('[NotifHelper] ページ内バナー表示イベントを発火');
-            window.dispatchEvent(new CustomEvent('show-in-app-notification', {
-              detail: {
-                title,
-                body: options.body || '',
-                slot: options.data.slot,
-                date: options.data.date
-              }
-            }));
+          if (options.data) {
+            if (options.data.slot) {
+              // 通常の通知（slotあり）
+              console.log('[NotifHelper] ページ内バナー表示イベントを発火');
+              window.dispatchEvent(new CustomEvent('show-in-app-notification', {
+                detail: {
+                  title,
+                  body: options.body || '',
+                  slot: options.data.slot,
+                  date: options.data.date
+                }
+              }));
+            } else if (options.data.type === 'family-notification') {
+              // 家族通知（slotなし）
+              console.log('[NotifHelper] 家族通知のページ内バナー表示イベントを発火');
+              window.dispatchEvent(new CustomEvent('show-family-notification', {
+                detail: {
+                  title,
+                  body: options.body || ''
+                }
+              }));
+            }
           }
         }
       }, 5000);
