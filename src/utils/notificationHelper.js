@@ -6,22 +6,54 @@ export async function requestPermission() {
 
 export async function showNotification(title, options = {}) {
   console.log('[NotifHelper] Showing notification:', title, options);
+  
+  // PCかスマホかを判定
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                (window.navigator.standalone === true) ||
+                document.referrer.includes('android-app://');
+  
+  // スマホPWAの場合はService Worker経由、それ以外は直接Notification APIを使用
+  const useSW = isMobile && isPWA;
+  
   try {
-    // Service Worker経由を試す
-    if ('serviceWorker' in navigator) {
+    if (useSW && 'serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg) {
-        console.log('[NotifHelper] Using SW to show notification');
-        const result = await reg.showNotification(title, options);
-        console.log('[NotifHelper] SW通知送信結果:', result);
-        return result;
+        console.log('[NotifHelper] Using SW to show notification (mobile PWA)');
+        try {
+          await reg.showNotification(title, options);
+          console.log('[NotifHelper] SW通知送信完了');
+          return;
+        } catch (swError) {
+          console.error('[NotifHelper] SW通知エラー、直接APIにフォールバック:', swError);
+          // SW経由が失敗した場合、直接APIにフォールバック
+        }
       }
     }
-    // SWがない場合、直接Notification APIを使用
+    
+    // PCまたはSWがない場合、直接Notification APIを使用
     if ('Notification' in window && Notification.permission === 'granted') {
       console.log('[NotifHelper] Using Notification API directly');
       const result = new Notification(title, options);
-      console.log('[NotifHelper] 直接通知送信結果:', result);
+      console.log('[NotifHelper] 直接通知送信完了:', result);
+      
+      // 通知クリック時の処理（直接APIの場合）
+      if (options.data) {
+        result.onclick = () => {
+          console.log('[NotifHelper] 通知クリック:', options.data);
+          result.close();
+          window.focus();
+          // URLパラメータでバナーを表示
+          if (options.data.slot && options.data.date) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('slot', options.data.slot);
+            url.searchParams.set('date', options.data.date);
+            window.location.href = url.toString();
+          }
+        };
+      }
+      
       return result;
     } else {
       console.warn('[NotifHelper] 通知が送れません。許可状態:', Notification.permission);
