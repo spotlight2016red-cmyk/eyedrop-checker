@@ -11,6 +11,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [testMode, setTestMode] = useState(false);
   const [noMotionStartTime, setNoMotionStartTime] = useState(null);
   const [remainingTime, setRemainingTime] = useState(null);
+  const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null });
   const lastFrameRef = useRef(null);
   const intervalRef = useRef(null);
   const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
@@ -108,19 +109,102 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
 
   const startMonitoring = async () => {
     try {
+      console.log('[CameraMonitor] カメラアクセス開始');
+      
+      // カメラアクセスの権限を確認
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('このブラウザはカメラアクセスをサポートしていません');
+      }
+      
+      // カメラアクセスをリクエスト
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }, // フロントカメラ
+        video: { 
+          facingMode: 'user', // フロントカメラ
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
-        setStream(mediaStream);
-        startMotionDetection();
+      
+      console.log('[CameraMonitor] カメラアクセス成功:', mediaStream);
+      
+      if (!videoRef.current) {
+        console.error('[CameraMonitor] video要素が見つかりません');
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
       }
+      
+      // video要素にストリームを設定
+      videoRef.current.srcObject = mediaStream;
+      
+      // video要素のイベントを監視
+      videoRef.current.onloadedmetadata = () => {
+        console.log('[CameraMonitor] メタデータ読み込み完了');
+        console.log('[CameraMonitor] 動画サイズ:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+        setCameraStatus({
+          width: videoRef.current?.videoWidth || 0,
+          height: videoRef.current?.videoHeight || 0,
+          readyState: videoRef.current?.readyState || 0,
+          error: null
+        });
+      };
+      
+      videoRef.current.onerror = (e) => {
+        console.error('[CameraMonitor] video要素エラー:', e);
+        setCameraStatus(prev => ({
+          ...prev,
+          error: videoRef.current?.error?.message || 'エラーが発生しました'
+        }));
+      };
+      
+      // 定期的に状態を更新
+      const statusInterval = setInterval(() => {
+        if (videoRef.current) {
+          setCameraStatus({
+            width: videoRef.current.videoWidth || 0,
+            height: videoRef.current.videoHeight || 0,
+            readyState: videoRef.current.readyState || 0,
+            error: videoRef.current.error ? videoRef.current.error.message : null
+          });
+        }
+      }, 1000);
+      
+      // クリーンアップ関数を保存（後で使用）
+      videoRef.current._statusInterval = statusInterval;
+      
+      // 再生を開始
+      try {
+        await videoRef.current.play();
+        console.log('[CameraMonitor] 動画再生開始');
+      } catch (playError) {
+        console.error('[CameraMonitor] 動画再生エラー:', playError);
+        // 再生に失敗した場合でも、ストリームは設定されているので続行
+      }
+      
+      setStream(mediaStream);
+      
+      // 少し待ってから動き検出を開始（カメラが安定するまで）
+      setTimeout(() => {
+        startMotionDetection();
+      }, 500);
+      
     } catch (err) {
-      console.error('カメラアクセスエラー:', err);
-      alert('カメラへのアクセスが許可されていません。設定を確認してください。');
+      console.error('[CameraMonitor] カメラアクセスエラー:', err);
+      
+      let errorMessage = 'カメラへのアクセスが許可されていません。';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = 'カメラへのアクセスが拒否されました。\n\nブラウザの設定からカメラへのアクセスを許可してください。\n\nSafari: 設定 > Safari > ウェブサイトの設定 > カメラ';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = 'カメラが見つかりませんでした。';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = 'カメラが他のアプリで使用中です。他のアプリを閉じてから再度お試しください。';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errorMessage = 'カメラの設定が対応していません。';
+      }
+      
+      alert(errorMessage);
+      setIsActive(false); // エラー時は監視を停止
     }
   };
 
@@ -137,8 +221,13 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       clearTimeout(noMotionTimer);
       setNoMotionTimer(null);
     }
+    if (videoRef.current && videoRef.current._statusInterval) {
+      clearInterval(videoRef.current._statusInterval);
+      videoRef.current._statusInterval = null;
+    }
     setNoMotionStartTime(null);
     setRemainingTime(null);
+    setCameraStatus({ width: 0, height: 0, readyState: 0, error: null });
     motionHistoryRef.current = []; // 動きの履歴をクリア
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -391,6 +480,15 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
                 {remainingTime !== null && (
                   <div>残り時間: {formatTime(remainingTime)}</div>
                 )}
+                {/* カメラ状態 */}
+                <div style={{ marginTop: '8px', borderTop: '1px solid #d1d5db', paddingTop: '8px' }}>
+                  <div>カメラ状態: {stream ? '接続済み' : '未接続'}</div>
+                  <div>動画サイズ: {cameraStatus.width} x {cameraStatus.height}</div>
+                  <div>再生状態: {cameraStatus.readyState === 4 ? '準備完了' : `準備中(${cameraStatus.readyState})`}</div>
+                  {cameraStatus.error && (
+                    <div style={{ color: '#ef4444' }}>エラー: {cameraStatus.error}</div>
+                  )}
+                </div>
               </div>
             )}
             <div className="status-indicator">
