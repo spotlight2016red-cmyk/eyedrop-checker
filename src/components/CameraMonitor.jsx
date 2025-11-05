@@ -11,7 +11,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [testMode, setTestMode] = useState(false);
   const [noMotionStartTime, setNoMotionStartTime] = useState(null);
   const [remainingTime, setRemainingTime] = useState(null);
-  const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null });
+  const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null, paused: true });
   const lastFrameRef = useRef(null);
   const intervalRef = useRef(null);
   const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
@@ -145,8 +145,19 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           width: videoRef.current?.videoWidth || 0,
           height: videoRef.current?.videoHeight || 0,
           readyState: videoRef.current?.readyState || 0,
-          error: null
+          error: null,
+          paused: videoRef.current?.paused ?? true
         });
+      };
+      
+      videoRef.current.oncanplay = () => {
+        console.log('[CameraMonitor] 動画再生可能');
+        // 再生を再試行
+        if (videoRef.current && videoRef.current.paused) {
+          videoRef.current.play().catch(err => {
+            console.error('[CameraMonitor] 再生再試行エラー:', err);
+          });
+        }
       };
       
       videoRef.current.onerror = (e) => {
@@ -164,13 +175,25 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             width: videoRef.current.videoWidth || 0,
             height: videoRef.current.videoHeight || 0,
             readyState: videoRef.current.readyState || 0,
-            error: videoRef.current.error ? videoRef.current.error.message : null
+            error: videoRef.current.error ? videoRef.current.error.message : null,
+            paused: videoRef.current.paused
           });
+          
+          // 再生状態を確認して、停止している場合は再開
+          if (videoRef.current.paused && videoRef.current.readyState >= 2) {
+            console.log('[CameraMonitor] 動画が停止しているため再開');
+            videoRef.current.play().catch(err => {
+              console.error('[CameraMonitor] 自動再生エラー:', err);
+            });
+          }
         }
       }, 1000);
       
       // クリーンアップ関数を保存（後で使用）
       videoRef.current._statusInterval = statusInterval;
+      
+      // ストリームを設定（先に設定）
+      setStream(mediaStream);
       
       // 再生を開始
       try {
@@ -180,8 +203,6 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         console.error('[CameraMonitor] 動画再生エラー:', playError);
         // 再生に失敗した場合でも、ストリームは設定されているので続行
       }
-      
-      setStream(mediaStream);
       
       // 少し待ってから動き検出を開始（カメラが安定するまで）
       setTimeout(() => {
@@ -227,7 +248,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     }
     setNoMotionStartTime(null);
     setRemainingTime(null);
-    setCameraStatus({ width: 0, height: 0, readyState: 0, error: null });
+    setCameraStatus({ width: 0, height: 0, readyState: 0, error: null, paused: true });
     motionHistoryRef.current = []; // 動きの履歴をクリア
     if (videoRef.current) {
       videoRef.current.srcObject = null;
@@ -482,11 +503,15 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
                 )}
                 {/* カメラ状態 */}
                 <div style={{ marginTop: '8px', borderTop: '1px solid #d1d5db', paddingTop: '8px' }}>
-                  <div>カメラ状態: {stream ? '接続済み' : '未接続'}</div>
+                  <div>カメラ状態: {stream || (videoRef.current && videoRef.current.srcObject) ? '接続済み' : '未接続'}</div>
                   <div>動画サイズ: {cameraStatus.width} x {cameraStatus.height}</div>
                   <div>再生状態: {cameraStatus.readyState === 4 ? '準備完了' : `準備中(${cameraStatus.readyState})`}</div>
+                  <div>再生中: {cameraStatus.paused ? '停止中' : '再生中'}</div>
                   {cameraStatus.error && (
                     <div style={{ color: '#ef4444' }}>エラー: {cameraStatus.error}</div>
+                  )}
+                  {videoRef.current && !videoRef.current.srcObject && (
+                    <div style={{ color: '#ef4444' }}>⚠️ ストリームが設定されていません</div>
                   )}
                 </div>
               </div>
