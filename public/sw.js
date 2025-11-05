@@ -33,18 +33,26 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = d.slot && d.date ? `/?slot=${encodeURIComponent(d.slot)}&date=${encodeURIComponent(d.date)}` : '/';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      let handled = false;
       for (const client of clientList) {
         // 既存タブがあれば遷移＋フォーカス
         if ('navigate' in client) {
           client.navigate(targetUrl);
         }
         // 追加: バックアップとしてメッセージも送る（同一タブで状態更新用）
-        try { client.postMessage({ type: 'from-notification', slot: d.slot, date: d.date }); } catch (e) {}
+        try { 
+          client.postMessage({ type: 'from-notification', slot: d.slot, date: d.date });
+          // localStorageフラグも立てる指示
+          if (d.slot && d.date) {
+            client.postMessage({ type: 'set-notif-flag', slot: d.slot, date: d.date });
+          }
+        } catch (e) {}
         if ('focus' in client) {
+          handled = true;
           return client.focus();
         }
       }
-      if (self.clients.openWindow) {
+      if (!handled && self.clients.openWindow) {
         return self.clients.openWindow(targetUrl);
       }
     })

@@ -78,11 +78,44 @@ function App() {
           const jp2 = data.slot === 'morning' ? '朝' : data.slot === 'noon' ? '昼' : '夜';
           setBanner({ text: `通知から開きました（${jp2}）`, slot: data.slot });
         }
+        // localStorageフラグを立てる指示
+        if (data.type === 'set-notif-flag' && data.slot && data.date) {
+          try {
+            localStorage.setItem('eyedrop-checker:notif-flag', JSON.stringify({ slot: data.slot, date: data.date }));
+          } catch {}
+        }
       };
       navigator.serviceWorker.addEventListener('message', onMsg);
-      return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+      
+      // ページフォーカス時にlocalStorageフラグをチェック（Chrome向け）
+      const checkFlag = () => {
+        try {
+          const flag = localStorage.getItem('eyedrop-checker:notif-flag');
+          if (flag) {
+            const parsed = JSON.parse(flag);
+            if (parsed.slot && parsed.date === key) {
+              const jp3 = parsed.slot === 'morning' ? '朝' : parsed.slot === 'noon' ? '昼' : '夜';
+              setBanner({ text: `通知から開きました（${jp3}）`, slot: parsed.slot });
+              localStorage.removeItem('eyedrop-checker:notif-flag');
+            }
+          }
+        } catch {}
+      };
+      
+      // フォーカス時と初回ロード時にチェック
+      checkFlag();
+      const onFocus = () => setTimeout(checkFlag, 100);
+      window.addEventListener('focus', onFocus);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) setTimeout(checkFlag, 100);
+      });
+      
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', onMsg);
+        window.removeEventListener('focus', onFocus);
+      };
     }
-  }, []);
+  }, [key]);
 
   const toggle = (slotId) => {
     setData((prev) => ({
