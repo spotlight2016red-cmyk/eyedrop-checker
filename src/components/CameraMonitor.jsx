@@ -259,6 +259,25 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
                 動きなし: 残り {formatTime(remainingTime)}
               </div>
             )}
+            {/* デバッグ情報 */}
+            {isActive && (
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#64748b',
+                marginTop: '8px',
+                padding: '8px',
+                background: '#f3f4f6',
+                borderRadius: '4px'
+              }}>
+                <div>タイマー状態: {noMotionStartTime ? '開始済み' : '未開始'}</div>
+                {noMotionStartTime && (
+                  <div>開始時刻: {new Date(noMotionStartTime).toLocaleTimeString()}</div>
+                )}
+                {remainingTime !== null && (
+                  <div>残り時間: {formatTime(remainingTime)}</div>
+                )}
+              </div>
+            )}
             <div className="status-indicator">
               <span className={`status-dot ${isActive ? 'active' : ''}`}></span>
               {isActive ? '監視中' : '停止中'}
