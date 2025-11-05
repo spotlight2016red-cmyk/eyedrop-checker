@@ -38,6 +38,8 @@ self.addEventListener('notificationclick', (event) => {
         if ('navigate' in client) {
           client.navigate(targetUrl);
         }
+        // 追加: バックアップとしてメッセージも送る（同一タブで状態更新用）
+        try { client.postMessage({ type: 'from-notification', slot: d.slot, date: d.date }); } catch (e) {}
         if ('focus' in client) {
           return client.focus();
         }

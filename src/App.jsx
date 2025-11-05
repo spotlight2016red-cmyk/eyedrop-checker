@@ -69,6 +69,19 @@ function App() {
       url.search = '';
       window.history.replaceState({}, '', url);
     }
+
+    // SWからのpostMessage（フォーカスのみでナビゲートしないケースのバックアップ表示）
+    if ('serviceWorker' in navigator) {
+      const onMsg = (e) => {
+        const data = e.data || {};
+        if (data.type === 'from-notification' && data.slot) {
+          const jp2 = data.slot === 'morning' ? '朝' : data.slot === 'noon' ? '昼' : '夜';
+          setBanner({ text: `通知から開きました（${jp2}）`, slot: data.slot });
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', onMsg);
+      return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+    }
   }, []);
 
   const toggle = (slotId) => {
