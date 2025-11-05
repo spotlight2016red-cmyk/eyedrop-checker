@@ -10,6 +10,7 @@ export function FamilyNotification() {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [firestoreError, setFirestoreError] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -32,6 +33,10 @@ export function FamilyNotification() {
       setFamilyMembers(members);
     } catch (err) {
       console.error('家族メンバー読み込みエラー:', err);
+      // Firestoreが未作成の場合もエラーを表示しない（表示は継続）
+      if (err.code === 'failed-precondition' || err.message?.includes('Firestore')) {
+        setFirestoreError('Firestoreが設定されていません。Firebase ConsoleでFirestore Databaseを作成してください。');
+      }
     }
   };
 
@@ -75,6 +80,12 @@ export function FamilyNotification() {
     <div className="family-notification">
       <h3 className="family-title">家族通知設定</h3>
       <p className="family-desc">目薬の使用状況を家族に通知します（家族メンバーも同じアプリにログインしてください）</p>
+
+      {firestoreError && (
+        <div className="family-error">
+          {firestoreError}
+        </div>
+      )}
 
       <form onSubmit={addFamilyMember} className="family-form">
         <input

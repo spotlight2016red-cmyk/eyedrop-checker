@@ -19,6 +19,16 @@
   font-size: 14px;
 }
 
+.family-error {
+  padding: 12px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border: 2px solid #fca5a5;
+}
+
 .family-form {
   display: flex;
   gap: 8px;

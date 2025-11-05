@@ -18,7 +18,31 @@ if ('serviceWorker' in navigator) {
     });
   } else {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        // SWの更新を検知
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // 新しいSWがインストールされたら、ユーザーに通知（または自動リロード）
+                console.log('新しいバージョンが利用可能です。ページをリロードしてください。');
+                // 自動リロード（必要に応じてコメントアウト）
+                // window.location.reload();
+              }
+            });
+          }
+        });
+      }).catch(() => {});
+      
+      // 定期的にSWの更新をチェック
+      setInterval(() => {
+        navigator.serviceWorker.getRegistration().then((registration) => {
+          if (registration) {
+            registration.update();
+          }
+        });
+      }, 60000); // 1分ごとにチェック
     });
   }
 }
