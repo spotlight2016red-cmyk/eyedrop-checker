@@ -397,9 +397,21 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           // 動きの履歴をクリア
           motionHistoryRef.current = [];
         } else {
-          // 単発の動きだけではタイマーをリセットしない（冷蔵庫を開けるだけでは通知しない）
+          // 動きが検出された場合、タイマーをリセット（パターン検出ではない場合でも）
           // ただし、動き検出回数は増やす
           setMotionCount(prev => prev + 1);
+          
+          // タイマーが開始されている場合のみリセット（最初の動き検出ではリセットしない）
+          if (noMotionStartTimeRef.current) {
+            console.log('[CameraMonitor] 動き検出: タイマーをリセット');
+            if (noMotionTimer) {
+              clearTimeout(noMotionTimer);
+              setNoMotionTimer(null);
+            }
+            noMotionStartTimeRef.current = null;
+            setNoMotionStartTime(null);
+            setRemainingTime(null);
+          }
         }
       } else {
         // 動きが検出されない場合、タイマーを開始
