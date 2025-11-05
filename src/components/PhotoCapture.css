@@ -1,0 +1,425 @@
+.photo-capture {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 16px;
+  border: 2px solid #e5e7eb;
+}
+
+.photo-mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.photo-btn-selfie {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-color: #3b82f6;
+}
+
+.photo-btn-selfie:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.photo-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #1f2937;
+}
+
+.photo-desc {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 16px 0;
+  line-height: 1.6;
+}
+
+.photo-btn {
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 2px solid #3b82f6;
+  background: white;
+  color: #3b82f6;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.photo-btn:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+.photo-camera-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.photo-video-container {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  min-height: 300px;
+}
+
+.photo-video {
+  width: 100%;
+  max-height: 500px;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.photo-preview img {
+  max-width: 100%;
+  max-height: 70%;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.photo-preview-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.photo-btn-cancel,
+.photo-btn-upload {
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.photo-btn-cancel {
+  background: #ef4444;
+  color: white;
+}
+
+.photo-btn-cancel:hover {
+  background: #dc2626;
+}
+
+.photo-btn-upload {
+  background: #22c55e;
+  color: white;
+}
+
+.photo-btn-upload:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.photo-btn-upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.photo-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.photo-btn-capture {
+  padding: 16px 32px;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  border: 4px solid #3b82f6;
+  background: white;
+  color: #3b82f6;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-btn-capture:hover {
+  background: #3b82f6;
+  color: white;
+  transform: scale(1.05);
+}
+
+.photo-btn-stop {
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 2px solid #ef4444;
+  background: white;
+  color: #ef4444;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.photo-btn-stop:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.photo-list {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.photo-list-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: #1f2937;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.photo-item {
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  border: 2px solid #e5e7eb;
+}
+
+.photo-item img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-date {
+  font-size: 12px;
+  color: #64748b;
+  padding: 8px;
+  margin: 0;
+  text-align: center;
+}
+
+/* カウントダウン */
+.photo-countdown {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.photo-countdown-number {
+  font-size: 120px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
+  animation: countdown-pulse 0.8s ease-in-out;
+}
+
+@keyframes countdown-pulse {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 撮影中表示 */
+.photo-capturing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.photo-capturing-text {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  animation: capturing-pulse 1s ease-in-out infinite;
+}
+
+@keyframes capturing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 再生画面 */
+.photo-playback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+
+.photo-playback-image {
+  max-width: 100%;
+  max-height: 60%;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.photo-playback-info {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.photo-playback-controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.photo-btn-play,
+.photo-btn-reset,
+.photo-btn-stop-playback {
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.photo-btn-play {
+  background: #22c55e;
+  color: white;
+}
+
+.photo-btn-play:hover {
+  background: #16a34a;
+}
+
+.photo-btn-reset {
+  background: #64748b;
+  color: white;
+}
+
+.photo-btn-reset:hover {
+  background: #475569;
+}
+
+.photo-btn-stop-playback {
+  background: #ef4444;
+  color: white;
+}
+
+.photo-btn-stop-playback:hover {
+  background: #dc2626;
+}
+
+.photo-confirm-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.photo-btn-reject,
+.photo-btn-confirm {
+  padding: 16px 32px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 18px;
+  min-width: 120px;
+}
+
+.photo-btn-reject {
+  background: #ef4444;
+  color: white;
+}
+
+.photo-btn-reject:hover:not(:disabled) {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+.photo-btn-confirm {
+  background: #22c55e;
+  color: white;
+}
+
+.photo-btn-confirm:hover:not(:disabled) {
+  background: #16a34a;
+  transform: scale(1.05);
+}
+
+.photo-btn-reject:disabled,
+.photo-btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.photo-btn-capture-selfie {
+  padding: 16px 32px;
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  border: 4px solid #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.photo-btn-capture-selfie:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: scale(1.05);
+}
+
+.photo-btn-capture-selfie:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

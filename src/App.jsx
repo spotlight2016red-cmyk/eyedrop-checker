@@ -5,6 +5,7 @@ import { AvatarMascot } from './components/AvatarMascot.jsx'
 import { useAuth } from './contexts/AuthContext.jsx'
 import { Login } from './components/Login.jsx'
 import { CameraMonitor } from './components/CameraMonitor.jsx'
+import { PhotoCapture } from './components/PhotoCapture.jsx'
 import { FamilyNotification, notifyFamily } from './components/FamilyNotification.jsx'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from './config/firebase.js'
@@ -621,6 +622,10 @@ function AppContent() {
             }
           }}
         />
+      </section>
+
+      <section className="photo-capture-section">
+        <PhotoCapture />
       </section>
 
       <footer className="foot">

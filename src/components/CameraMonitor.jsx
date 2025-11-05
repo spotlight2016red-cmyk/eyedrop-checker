@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../config/firebase.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import './CameraMonitor.css';
 
 export function CameraMonitor({ onMotionDetected, onNoMotion }) {
+  const { user } = useAuth();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [isActive, setIsActive] = useState(false);
