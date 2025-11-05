@@ -82,6 +82,8 @@
   background: white;
   border-radius: 8px;
   border: 1px solid #bae6fd;
+  color: #1e40af;
+  font-weight: 500;
 }
 
 .family-remove-btn {
