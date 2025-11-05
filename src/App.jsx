@@ -248,6 +248,11 @@ function App() {
               }}
             />
             <span>通知を有効にする</span>
+            {settings.notifications && 'Notification' in window && (
+              <span style={{ fontSize: '12px', color: Notification.permission === 'granted' ? '#22c55e' : Notification.permission === 'denied' ? '#ef4444' : '#64748b', marginLeft: '8px' }}>
+                {Notification.permission === 'granted' ? '（許可済み）' : Notification.permission === 'denied' ? '（拒否）' : '（未許可）'}
+              </span>
+            )}
           </label>
           <button
             className="btn"
