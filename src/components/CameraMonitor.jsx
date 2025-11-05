@@ -141,6 +141,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       videoRef.current.onloadedmetadata = () => {
         console.log('[CameraMonitor] メタデータ読み込み完了');
         console.log('[CameraMonitor] 動画サイズ:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+        console.log('[CameraMonitor] readyState:', videoRef.current?.readyState);
         setCameraStatus({
           width: videoRef.current?.videoWidth || 0,
           height: videoRef.current?.videoHeight || 0,
@@ -148,16 +149,47 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           error: null,
           paused: videoRef.current?.paused ?? true
         });
+        
+        // メタデータ読み込み後、再生を開始
+        if (videoRef.current && videoRef.current.paused) {
+          console.log('[CameraMonitor] メタデータ読み込み後、再生を開始');
+          videoRef.current.play().then(() => {
+            console.log('[CameraMonitor] 再生成功');
+          }).catch(err => {
+            console.error('[CameraMonitor] メタデータ読み込み後の再生エラー:', err);
+          });
+        }
       };
       
       videoRef.current.oncanplay = () => {
         console.log('[CameraMonitor] 動画再生可能');
+        setCameraStatus(prev => ({
+          ...prev,
+          readyState: videoRef.current?.readyState || 0,
+          paused: videoRef.current?.paused ?? true
+        }));
         // 再生を再試行
         if (videoRef.current && videoRef.current.paused) {
           videoRef.current.play().catch(err => {
             console.error('[CameraMonitor] 再生再試行エラー:', err);
           });
         }
+      };
+      
+      videoRef.current.onplay = () => {
+        console.log('[CameraMonitor] 動画再生開始');
+        setCameraStatus(prev => ({
+          ...prev,
+          paused: false
+        }));
+      };
+      
+      videoRef.current.onpause = () => {
+        console.log('[CameraMonitor] 動画再生停止');
+        setCameraStatus(prev => ({
+          ...prev,
+          paused: true
+        }));
       };
       
       videoRef.current.onerror = (e) => {
@@ -171,10 +203,14 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       // 定期的に状態を更新
       const statusInterval = setInterval(() => {
         if (videoRef.current) {
+          // 動画サイズが取得できている場合は、メタデータが読み込まれていると判断
+          const hasMetadata = videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0;
+          const currentReadyState = videoRef.current.readyState;
+          
           setCameraStatus({
             width: videoRef.current.videoWidth || 0,
             height: videoRef.current.videoHeight || 0,
-            readyState: videoRef.current.readyState || 0,
+            readyState: hasMetadata && currentReadyState === 0 ? 1 : currentReadyState, // メタデータが読み込まれている場合は1以上に設定
             error: videoRef.current.error ? videoRef.current.error.message : null,
             paused: videoRef.current.paused
           });
@@ -471,7 +507,47 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             playsInline
             muted
             className="camera-video"
+            onClick={() => {
+              // 動画要素をクリックしたときに再生を開始
+              if (videoRef.current && videoRef.current.paused) {
+                videoRef.current.play().catch(err => {
+                  console.error('[CameraMonitor] クリック時の再生エラー:', err);
+                });
+              }
+            }}
+            style={{ cursor: 'pointer' }}
           />
+          {cameraStatus.width === 0 && cameraStatus.height === 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: '#fff',
+              fontSize: '14px',
+              textAlign: 'center',
+              pointerEvents: 'none'
+            }}>
+              カメラを読み込み中...
+            </div>
+          )}
+          {cameraStatus.width > 0 && cameraStatus.height > 0 && cameraStatus.paused && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: '#fff',
+              fontSize: '14px',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              background: 'rgba(0, 0, 0, 0.5)',
+              padding: '8px 16px',
+              borderRadius: '8px'
+            }}>
+              タップして再生
+            </div>
+          )}
           <canvas ref={canvasRef} className="camera-canvas" style={{ display: 'none' }} />
           <div className="camera-status">
             <div>動き検出回数: {motionCount}</div>
