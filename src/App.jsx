@@ -235,8 +235,27 @@ function AppContent() {
           <div style={{ whiteSpace: 'pre-line' }}>新しいバージョンが利用可能です</div>
           <button
             className="banner-btn"
-            onClick={() => {
-              window.location.reload();
+            onClick={async () => {
+              // SWの更新を待ってからリロード
+              if ('serviceWorker' in navigator) {
+                try {
+                  const registration = await navigator.serviceWorker.getRegistration();
+                  if (registration && registration.waiting) {
+                    // 新しいSWが待機中なら、アクティベートしてからリロード
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                  // 少し待ってからリロード
+                  setTimeout(() => {
+                    window.location.reload(true);
+                  }, 500);
+                } catch (err) {
+                  console.error('SW更新エラー:', err);
+                  // エラーでもリロード
+                  window.location.reload(true);
+                }
+              } else {
+                window.location.reload(true);
+              }
             }}
             style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}
           >アプリを更新</button>
