@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, where, getDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import './FamilyNotification.css';
@@ -39,6 +40,9 @@ export function FamilyNotification() {
     if (!user || !email) return;
     setLoading(true);
     try {
+      // メールアドレスからユーザーIDを取得（ユーザーが既に登録済みの場合）
+      const auth = getAuth();
+      // メールアドレスだけで保存（ログイン時にマッチング）
       await addDoc(collection(db, 'familyMembers'), {
         userId: user.uid,
         email: email.trim(),
@@ -65,29 +69,12 @@ export function FamilyNotification() {
     }
   };
 
-  const sendNotificationToFamily = async (message) => {
-    if (!user) return;
-    try {
-      // 家族メンバーに通知を送信するCloud Functionを呼び出す
-      // または、Firestoreに通知データを書き込んで、各デバイスが監視する
-      const notificationData = {
-        userId: user.uid,
-        message,
-        timestamp: new Date(),
-        read: false
-      };
-      await addDoc(collection(db, 'notifications'), notificationData);
-    } catch (err) {
-      console.error('通知送信エラー:', err);
-    }
-  };
-
   if (!user) return null;
 
   return (
     <div className="family-notification">
       <h3 className="family-title">家族通知設定</h3>
-      <p className="family-desc">目薬の使用状況を家族に通知します</p>
+      <p className="family-desc">目薬の使用状況を家族に通知します（家族メンバーも同じアプリにログインしてください）</p>
 
       <form onSubmit={addFamilyMember} className="family-form">
         <input
@@ -122,7 +109,8 @@ export function FamilyNotification() {
       </div>
 
       <div className="family-note">
-        <p>※ 家族メンバーには、目薬の使用が検出されない場合に通知が送られます。</p>
+        <p>※ 家族メンバーも同じアプリにログインすると、通知を受け取れます。</p>
+        <p>※ カメラで5分間動きが検出されない場合、家族全員に通知が送られます。</p>
       </div>
     </div>
   );
@@ -131,13 +119,32 @@ export function FamilyNotification() {
 // 家族に通知を送信する関数（エクスポート）
 export async function notifyFamily(userId, message) {
   try {
-    const notificationData = {
-      userId,
-      message,
-      timestamp: new Date(),
-      read: false
-    };
-    await addDoc(collection(db, 'notifications'), notificationData);
+    // 家族メンバーを取得
+    const q = query(
+      collection(db, 'familyMembers'),
+      where('userId', '==', userId)
+    );
+    const snapshot = await getDocs(q);
+    const familyEmails = snapshot.docs.map(doc => doc.data().email);
+
+    // 各家族メンバーのユーザーIDを取得して通知を作成
+    const notifications = [];
+    for (const email of familyEmails) {
+      // メールアドレスでユーザーを検索（usersコレクションに保存されている場合）
+      // または、通知をメールアドレスベースで保存
+      notifications.push({
+        email: email,
+        message: message,
+        timestamp: new Date(),
+        read: false,
+        type: 'camera-alert'
+      });
+    }
+
+    // 通知を保存
+    for (const notif of notifications) {
+      await addDoc(collection(db, 'notifications'), notif);
+    }
   } catch (err) {
     console.error('家族通知送信エラー:', err);
   }

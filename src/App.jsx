@@ -6,6 +6,8 @@ import { useAuth } from './contexts/AuthContext.jsx'
 import { Login } from './components/Login.jsx'
 import { CameraMonitor } from './components/CameraMonitor.jsx'
 import { FamilyNotification, notifyFamily } from './components/FamilyNotification.jsx'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { db } from './config/firebase.js'
 
 function todayKey() {
   const d = new Date();
@@ -62,6 +64,32 @@ function AppContent() {
     const stop = startScheduler(() => data, () => settings);
     return () => stop && stop();
   }, [data, settings]);
+
+  // 家族通知のリアルタイム監視（自分宛の通知を受け取る）
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('email', '==', user.email),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const notif = change.doc.data();
+          showNotification('家族からの通知', {
+            body: notif.message,
+            tag: `family-${change.doc.id}`,
+            data: { type: 'family-notification', id: change.doc.id }
+          });
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   // handle deep-link from notification: /?slot=...&date=...
   useEffect(() => {
