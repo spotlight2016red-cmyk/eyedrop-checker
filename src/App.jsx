@@ -46,6 +46,7 @@ function AppContent() {
   });
   const [banner, setBanner] = useState(null); // { text, slot }
   const [highlightSlot, setHighlightSlot] = useState(null); // 'morning' | 'noon' | 'night' | null
+  const [updateAvailable, setUpdateAvailable] = useState(false); // SW更新が利用可能か
 
   const key = useMemo(() => todayKey(), []);
   const day = data[key] ?? { morning: false, noon: false, night: false, note: '' };
@@ -90,6 +91,30 @@ function AppContent() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // SW更新の検知
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration) {
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  setUpdateAvailable(true);
+                }
+              });
+            }
+          });
+          // 定期的に更新をチェック
+          setInterval(() => {
+            registration.update();
+          }, 60000);
+        }
+      });
+    }
+  }, []);
 
   // handle deep-link from notification: /?slot=...&date=...
   useEffect(() => {
@@ -200,6 +225,19 @@ function AppContent() {
               }}
             >{banner.slot === 'morning' ? '朝' : banner.slot === 'noon' ? '昼' : '夜'}を「済」にする</button>
           )}
+        </div>
+      )}
+      
+      {updateAvailable && (
+        <div className="banner" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', borderColor: '#f59e0b', color: '#92400e' }}>
+          <div style={{ whiteSpace: 'pre-line' }}>新しいバージョンが利用可能です</div>
+          <button
+            className="banner-btn"
+            onClick={() => {
+              window.location.reload();
+            }}
+            style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}
+          >アプリを更新</button>
         </div>
       )}
       <h1 className="title">目薬チェック</h1>
