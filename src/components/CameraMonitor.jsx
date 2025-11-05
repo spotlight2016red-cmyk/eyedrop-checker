@@ -8,10 +8,31 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [stream, setStream] = useState(null);
   const [motionCount, setMotionCount] = useState(0);
   const [noMotionTimer, setNoMotionTimer] = useState(null);
+  const [testMode, setTestMode] = useState(false);
+  const [noMotionStartTime, setNoMotionStartTime] = useState(null);
+  const [remainingTime, setRemainingTime] = useState(null);
   const lastFrameRef = useRef(null);
   const animationFrameRef = useRef(null);
 
-  const NO_MOTION_THRESHOLD = 5 * 60 * 1000; // 5分（ミリ秒）
+  const NO_MOTION_THRESHOLD = testMode ? 30 * 1000 : 5 * 60 * 1000; // テストモード: 30秒、通常: 5分（ミリ秒）
+  
+  // 残り時間を計算する（1秒ごとに更新）
+  useEffect(() => {
+    if (!isActive || !noMotionStartTime) {
+      setRemainingTime(null);
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      if (noMotionStartTime) {
+        const elapsed = Date.now() - noMotionStartTime;
+        const remaining = Math.max(0, NO_MOTION_THRESHOLD - elapsed);
+        setRemainingTime(remaining);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isActive, noMotionStartTime, NO_MOTION_THRESHOLD]);
 
   useEffect(() => {
     if (isActive && videoRef.current) {
@@ -54,6 +75,8 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       clearTimeout(noMotionTimer);
       setNoMotionTimer(null);
     }
+    setNoMotionStartTime(null);
+    setRemainingTime(null);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -93,11 +116,36 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         // 動きがあったらタイマーをリセット
         if (noMotionTimer) {
           clearTimeout(noMotionTimer);
+          setNoMotionTimer(null);
         }
-        const timer = setTimeout(() => {
-          if (onNoMotion) onNoMotion();
-        }, NO_MOTION_THRESHOLD);
-        setNoMotionTimer(timer);
+        setNoMotionStartTime(null);
+        setRemainingTime(null);
+      } else {
+        // 動きが検出されない場合、タイマーを開始
+        const now = Date.now();
+        if (!noMotionStartTime) {
+          setNoMotionStartTime(now);
+        }
+        
+        if (!noMotionTimer && noMotionStartTime) {
+          const elapsed = now - noMotionStartTime;
+          const remaining = NO_MOTION_THRESHOLD - elapsed;
+          
+          if (remaining > 0) {
+            const timer = setTimeout(() => {
+              if (onNoMotion) onNoMotion();
+              setNoMotionTimer(null);
+              setNoMotionStartTime(null);
+              setRemainingTime(null);
+            }, remaining);
+            setNoMotionTimer(timer);
+          } else {
+            // 既に閾値を超えている場合
+            if (onNoMotion) onNoMotion();
+            setNoMotionStartTime(null);
+            setRemainingTime(null);
+          }
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(detectMotion);
@@ -134,16 +182,39 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     return diffRatio > 0.05; // 5%以上の変化があれば動きあり
   };
 
+  const formatTime = (ms) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes > 0) {
+      return `${minutes}分${remainingSeconds}秒`;
+    }
+    return `${remainingSeconds}秒`;
+  };
+
   return (
     <div className="camera-monitor">
       <div className="camera-header">
         <h2>カメラ監視モード</h2>
-        <button
-          className={`camera-toggle ${isActive ? 'active' : ''}`}
-          onClick={() => setIsActive(!isActive)}
-        >
-          {isActive ? '監視を停止' : '監視を開始'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {!isActive && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}>
+              <input
+                type="checkbox"
+                checked={testMode}
+                onChange={(e) => setTestMode(e.target.checked)}
+                disabled={isActive}
+              />
+              <span>テストモード（30秒）</span>
+            </label>
+          )}
+          <button
+            className={`camera-toggle ${isActive ? 'active' : ''}`}
+            onClick={() => setIsActive(!isActive)}
+          >
+            {isActive ? '監視を停止' : '監視を開始'}
+          </button>
+        </div>
       </div>
 
       {isActive && (
@@ -158,6 +229,15 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           <canvas ref={canvasRef} className="camera-canvas" style={{ display: 'none' }} />
           <div className="camera-status">
             <div>動き検出回数: {motionCount}</div>
+            {remainingTime !== null && remainingTime > 0 && (
+              <div style={{ 
+                color: remainingTime < 10000 ? '#ef4444' : '#64748b',
+                fontWeight: remainingTime < 10000 ? 'bold' : 'normal',
+                fontSize: '14px'
+              }}>
+                動きなし: 残り {formatTime(remainingTime)}
+              </div>
+            )}
             <div className="status-indicator">
               <span className={`status-dot ${isActive ? 'active' : ''}`}></span>
               {isActive ? '監視中' : '停止中'}
@@ -169,7 +249,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       {!isActive && (
         <div className="camera-placeholder">
           <p>カメラ監視を開始すると、動きを検出します。</p>
-          <p>5分間動きが検出されない場合、通知が送られます。</p>
+          <p>{testMode ? '30秒' : '5分'}間動きが検出されない場合、通知が送られます。</p>
         </div>
       )}
     </div>
