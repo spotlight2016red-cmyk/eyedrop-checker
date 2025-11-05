@@ -380,10 +380,14 @@ function AppContent() {
           <button
             className="btn"
             onClick={async () => {
+              console.log('[App] テスト通知ボタンクリック');
               if (!('Notification' in window)) {
                 alert('このブラウザは通知に未対応です。ChromeまたはSafariでホーム画面に追加してください。');
                 return;
               }
+              
+              console.log('[App] Notification.permission:', Notification.permission);
+              
               // Service WorkerとPWAチェック
               const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
                            (window.navigator.standalone === true) ||
@@ -394,23 +398,34 @@ function AppContent() {
                 try {
                   const reg = await navigator.serviceWorker.getRegistration();
                   swRegistered = !!reg;
-                } catch {}
+                  console.log('[App] Service Worker登録:', swRegistered);
+                } catch (e) {
+                  console.error('[App] SW登録確認エラー:', e);
+                }
               }
               
-              if (!isPWA && !swRegistered) {
+              // PCの場合はService Workerがなくても通知可能（スマホの場合はPWA必須）
+              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+              if (isMobile && !isPWA && !swRegistered) {
                 alert('通知を使うには、ホーム画面に追加（PWAインストール）が必要です。\n\n手順:\n1. ブラウザメニューから「ホーム画面に追加」を選択\n2. インストール後、アイコンからアプリを起動\n3. 再度テスト通知を試してください');
                 return;
               }
               
               if (Notification.permission !== 'granted') {
+                console.log('[App] 通知許可をリクエスト');
                 const p = await Notification.requestPermission();
+                console.log('[App] 通知許可結果:', p);
                 if (p === 'granted') {
-                  showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
+                  console.log('[App] 通知許可OK、通知を送信');
+                  const result = await showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
+                  console.log('[App] 通知送信結果:', result);
                 } else if (p === 'denied') {
                   alert('通知が拒否されました。ブラウザの設定から通知を許可してください。');
                 }
               } else {
-                showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
+                console.log('[App] 通知許可済み、通知を送信');
+                const result = await showNotification('テスト通知', { body: '目薬チェックのテストです', data: { slot: 'morning', date: key }, tag: `test-${key}` });
+                console.log('[App] 通知送信結果:', result);
               }
             }}
           >テスト通知</button>

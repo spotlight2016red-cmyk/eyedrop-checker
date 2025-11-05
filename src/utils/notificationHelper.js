@@ -7,19 +7,35 @@ export async function requestPermission() {
 export async function showNotification(title, options = {}) {
   console.log('[NotifHelper] Showing notification:', title, options);
   try {
+    // Service Worker経由を試す
     if ('serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg) {
         console.log('[NotifHelper] Using SW to show notification');
-        return reg.showNotification(title, options);
+        const result = await reg.showNotification(title, options);
+        console.log('[NotifHelper] SW通知送信結果:', result);
+        return result;
       }
     }
+    // SWがない場合、直接Notification APIを使用
     if ('Notification' in window && Notification.permission === 'granted') {
       console.log('[NotifHelper] Using Notification API directly');
-      return new Notification(title, options);
+      const result = new Notification(title, options);
+      console.log('[NotifHelper] 直接通知送信結果:', result);
+      return result;
+    } else {
+      console.warn('[NotifHelper] 通知が送れません。許可状態:', Notification.permission);
     }
   } catch (e) {
     console.error('[NotifHelper] Error showing notification:', e);
+    // エラー時も直接Notification APIを試す
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        return new Notification(title, options);
+      } catch (e2) {
+        console.error('[NotifHelper] 直接通知もエラー:', e2);
+      }
+    }
   }
 }
 
