@@ -43,6 +43,44 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const d = event.notification?.data || {};
   console.log('[SW] Notification data:', d);
+  
+  // カメラ監視からの通知（動きなし）
+  if (d.type === 'camera-no-motion') {
+    const targetUrl = '/';
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        console.log('[SW] Found clients:', clientList.length);
+        let handled = false;
+        for (const client of clientList) {
+          console.log('[SW] Processing client:', client.url);
+          // 既存タブがあれば遷移＋フォーカス
+          if ('navigate' in client) {
+            console.log('[SW] Navigating to:', targetUrl);
+            client.navigate(targetUrl);
+          }
+          // カメラ監視通知のメッセージを送信
+          try { 
+            console.log('[SW] Sending camera-no-motion message:', { type: 'camera-no-motion', date: d.date, message: d.message });
+            client.postMessage({ type: 'camera-no-motion', date: d.date, message: d.message });
+          } catch (e) {
+            console.error('[SW] Error sending message:', e);
+          }
+          if ('focus' in client) {
+            console.log('[SW] Focusing client');
+            handled = true;
+            return client.focus();
+          }
+        }
+        if (!handled && self.clients.openWindow) {
+          console.log('[SW] Opening new window:', targetUrl);
+          return self.clients.openWindow(targetUrl);
+        }
+      })
+    );
+    return;
+  }
+  
+  // 通常のスロット通知（朝/昼/夜）
   const targetUrl = d.slot && d.date ? `/?slot=${encodeURIComponent(d.slot)}&date=${encodeURIComponent(d.date)}` : '/';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

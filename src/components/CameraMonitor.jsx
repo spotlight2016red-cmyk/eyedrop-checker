@@ -17,6 +17,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const intervalRef = useRef(null);
   const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
   const noMotionStartTimeRef = useRef(null); // noMotionStartTimeの最新値を保持
+  const noMotionNotifiedRef = useRef(false); // 通知を送ったかどうかのフラグ
 
   const NO_MOTION_THRESHOLD = testMode ? 30 * 1000 : 5 * 60 * 1000; // テストモード: 30秒、通常: 5分（ミリ秒）
   
@@ -327,6 +328,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     setNoMotionStartTime(null);
     setRemainingTime(null);
     noMotionStartTimeRef.current = null; // refもリセット
+    noMotionNotifiedRef.current = false; // 通知フラグもリセット
     setCameraStatus({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
     setPatternDetected(false); // パターン検出表示をリセット
     motionHistoryRef.current = []; // 動きの履歴をクリア
@@ -393,6 +395,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           noMotionStartTimeRef.current = null;
           setNoMotionStartTime(null);
           setRemainingTime(null);
+          noMotionNotifiedRef.current = false; // 通知フラグをリセット
           
           // 動きの履歴をクリア
           motionHistoryRef.current = [];
@@ -411,6 +414,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             noMotionStartTimeRef.current = null;
             setNoMotionStartTime(null);
             setRemainingTime(null);
+            noMotionNotifiedRef.current = false; // 通知フラグをリセット
           }
         }
       } else {
@@ -438,17 +442,16 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           const remaining = Math.max(0, NO_MOTION_THRESHOLD - elapsed);
           setRemainingTime(remaining);
           
-          // 残り時間が0になったら通知を送信
-          if (remaining === 0 && !noMotionTimer) {
+          // 残り時間が0になったら通知を送信（重複を防ぐ）
+          if (remaining === 0 && !noMotionNotifiedRef.current) {
             console.log('[CameraMonitor] 動きなしタイマー完了（残り時間0）');
+            noMotionNotifiedRef.current = true; // 通知フラグを設定
             if (onNoMotion) onNoMotion();
-            noMotionStartTimeRef.current = null;
-            setNoMotionStartTime(null);
-            setRemainingTime(null);
+            // タイマーはクリアしない（次の動き検出まで待つ）
           }
         }
         
-        // タイマーが設定されていない場合、設定する
+        // タイマーが設定されていない場合、設定する（remaining > 0の場合のみ）
         if (!noMotionTimer && noMotionStartTimeRef.current) {
           const elapsed = now - noMotionStartTimeRef.current;
           const remaining = NO_MOTION_THRESHOLD - elapsed;
@@ -456,21 +459,16 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           if (remaining > 0) {
             const timer = setTimeout(() => {
               console.log('[CameraMonitor] 動きなしタイマー完了');
-              if (onNoMotion) onNoMotion();
+              if (!noMotionNotifiedRef.current) {
+                noMotionNotifiedRef.current = true; // 通知フラグを設定
+                if (onNoMotion) onNoMotion();
+              }
               setNoMotionTimer(null);
-              noMotionStartTimeRef.current = null;
-              setNoMotionStartTime(null);
-              setRemainingTime(null);
+              // タイマーはクリアしない（次の動き検出まで待つ）
             }, remaining);
             setNoMotionTimer(timer);
-          } else {
-            // 既に閾値を超えている場合
-            console.log('[CameraMonitor] 既に閾値を超えています');
-            if (onNoMotion) onNoMotion();
-            noMotionStartTimeRef.current = null;
-            setNoMotionStartTime(null);
-            setRemainingTime(null);
           }
+          // remaining === 0の場合は上記の処理で通知を送信済み
         }
       }
     };

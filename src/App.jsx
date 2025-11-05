@@ -175,6 +175,17 @@ function AppContent() {
       const onMsg = (e) => {
         console.log('[App] SW message received:', e.data);
         const data = e.data || {};
+        
+        // カメラ監視からの通知（動きなし）
+        if (data.type === 'camera-no-motion' && data.date === key) {
+          console.log('[App] Showing camera-no-motion banner:', data.message);
+          setBanner({ 
+            text: data.message || `${key}の目薬が使用されていません（5分以上動きが検出されませんでした）`, 
+            slot: null 
+          });
+          return;
+        }
+        
         if (data.type === 'from-notification' && data.slot) {
           console.log('[App] Showing banner from notification:', data.slot);
           const jp2 = data.slot === 'morning' ? '朝' : data.slot === 'noon' ? '昼' : '夜';
@@ -236,7 +247,19 @@ function AppContent() {
   useEffect(() => {
     const handleNotificationClick = (e) => {
       console.log('[App] notification-clickedイベント受信:', e.detail);
-      const { slot, date } = e.detail || {};
+      const { slot, date, type, message } = e.detail || {};
+      
+      // カメラ監視からの通知（動きなし）
+      if (type === 'camera-no-motion' && date === key) {
+        console.log('[App] カメラ監視通知: バナーを表示');
+        setBanner({ 
+          text: message || `${key}の目薬が使用されていません（5分以上動きが検出されませんでした）`, 
+          slot: null 
+        });
+        return;
+      }
+      
+      // 通常のスロット通知（朝/昼/夜）
       if (slot && date === key) {
         const jp = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : '夜';
         console.log('[App] バナーを表示:', slot);
@@ -582,7 +605,16 @@ function AppContent() {
           }}
           onNoMotion={async () => {
             const message = `${key}の目薬が使用されていません（5分以上動きが検出されませんでした）`;
-            await showNotification('目薬の使用を確認してください', { body: message });
+            await showNotification('目薬の使用を確認してください', { 
+              body: message,
+              data: { 
+                type: 'camera-no-motion',
+                date: key,
+                message: message
+              },
+              tag: `camera-no-motion-${key}`, // 同じ日の通知は1つだけにする
+              requireInteraction: false
+            });
             if (user) {
               await notifyFamily(user.uid, message);
             }
