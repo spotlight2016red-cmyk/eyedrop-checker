@@ -111,6 +111,20 @@ export function FamilyNotification() {
       <div className="family-note">
         <p>※ 家族メンバーも同じアプリにログインすると、通知を受け取れます。</p>
         <p>※ カメラで5分間動きが検出されない場合、家族全員に通知が送られます。</p>
+        
+        <div style={{ marginTop: '16px' }}>
+          <button
+            onClick={async () => {
+              if (!user) return;
+              const message = `${new Date().toLocaleDateString('ja-JP')}の目薬が使用されていません（テスト通知）`;
+              await notifyFamily(user.uid, message);
+              alert('家族にテスト通知を送信しました。家族メンバーがログインしているデバイスで確認してください。');
+            }}
+            className="family-test-btn"
+          >
+            テスト通知を送信
+          </button>
+        </div>
       </div>
     </div>
   );
