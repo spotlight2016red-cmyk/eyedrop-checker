@@ -8,6 +8,7 @@ import { CameraMonitor } from './components/CameraMonitor.jsx'
 import { FamilyNotification, notifyFamily } from './components/FamilyNotification.jsx'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db } from './config/firebase.js'
+import { PWAInstallPrompt } from './components/PWAInstallPrompt.jsx'
 
 function todayKey() {
   const d = new Date();
@@ -209,6 +210,7 @@ function AppContent() {
 
   return (
     <div className="wrap">
+      <PWAInstallPrompt />
       <div style={{ display:'flex', justifyContent:'center' }}>
         <AvatarMascot size={100} />
       </div>
