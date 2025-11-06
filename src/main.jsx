@@ -58,14 +58,29 @@ if ('serviceWorker' in navigator) {
   // Optional: reset SW via query param
   const params = new URLSearchParams(window.location.search);
   if (params.get('reset-sw') === '1') {
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((r) => r.unregister());
-      caches && caches.keys().then(keys => keys.forEach(k => caches.delete(k))).finally(() => {
+    // Service Workerとキャッシュを完全にクリアしてからリロード
+    Promise.all([
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        return Promise.all(regs.map(r => r.unregister()));
+      }),
+      caches ? caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))) : Promise.resolve()
+    ]).then(() => {
+      // 少し待ってからリロード（確実にクリアされるように）
+      setTimeout(() => {
         const url = new URL(window.location.href);
         url.search = '';
-        window.location.replace(url.toString());
-      });
+        url.searchParams.set('_reload', Date.now().toString()); // キャッシュ回避
+        window.location.href = url.toString(); // replaceではなくhrefで確実にリロード
+      }, 500);
+    }).catch((err) => {
+      console.error('[SW Reset] エラー:', err);
+      // エラーが発生してもリロードを試みる
+      setTimeout(() => {
+        window.location.href = window.location.origin + window.location.pathname + '?_reload=' + Date.now();
+      }, 500);
     });
+    // リセット処理中は何もレンダリングしない
+    return;
   } else {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
