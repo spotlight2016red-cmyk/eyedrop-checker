@@ -362,6 +362,71 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     };
   }, [isActive, testMode, onNoMotion]);
 
+  // detectFrameDifferenceとcheckMotionPatternを先に定義（startMotionDetectionの前に）
+  const detectFrameDifference = (currentImageData) => {
+    if (!lastFrameRef.current) {
+      lastFrameRef.current = currentImageData;
+      return { hasMotion: false, intensity: 0 };
+    }
+
+    const currentData = currentImageData.data;
+    const lastData = lastFrameRef.current.data;
+    let diffPixels = 0;
+    let totalDiff = 0;
+    const threshold = 30; // 輝度差分の閾値
+
+    for (let i = 0; i < currentData.length; i += 4) {
+      const rDiff = Math.abs(currentData[i] - lastData[i]);
+      const gDiff = Math.abs(currentData[i + 1] - lastData[i + 1]);
+      const bDiff = Math.abs(currentData[i + 2] - lastData[i + 2]);
+      const avgDiff = (rDiff + gDiff + bDiff) / 3;
+
+      if (avgDiff > threshold) {
+        diffPixels++;
+        totalDiff += avgDiff;
+      }
+    }
+
+    const diffRatio = diffPixels / (currentData.length / 4);
+    const intensity = diffPixels > 0 ? totalDiff / diffPixels : 0; // 平均的な動きの強度
+    lastFrameRef.current = currentImageData;
+    
+    return { 
+      hasMotion: diffRatio > 0.05, // 5%以上の変化があれば動きあり
+      intensity: intensity
+    };
+  };
+
+  // 連続した動きパターンを検出（目薬を取ってさす動作）
+  const checkMotionPattern = () => {
+    const now = Date.now();
+    const history = motionHistoryRef.current;
+    
+    // 30秒以内の動きを保持
+    const recentHistory = history.filter(h => now - h.time < 30000);
+    motionHistoryRef.current = recentHistory;
+    
+    if (recentHistory.length < 3) {
+      return false; // 動きが少なすぎる
+    }
+    
+    // 動きの強度を分析
+    const intensities = recentHistory.map(h => h.intensity);
+    const avgIntensity = intensities.reduce((a, b) => a + b, 0) / intensities.length;
+    
+    // 大きな動き（冷蔵庫を開ける）と小さな動き（目薬をさす）の両方が検出された場合
+    // これは目薬を取ってさす動作パターンと判断
+    const hasLargeMotion = intensities.some(i => i > 50); // 大きな動き
+    const hasSmallMotion = intensities.some(i => i > 0 && i < 50); // 小さな動き
+    
+    if (hasLargeMotion && hasSmallMotion && recentHistory.length >= 3) {
+      console.log('[CameraMonitor] 目薬をさす動作パターンを検出');
+      return true;
+    }
+    
+    return false;
+  };
+
   // streamが設定された後に動き検出を開始
   useEffect(() => {
     if (!isActive || !stream || !videoRef.current || !canvasRef.current) return;
@@ -379,7 +444,8 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     return () => {
       clearTimeout(timer);
     };
-  }, [isActive, stream, startMotionDetection]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, stream]);
 
   const startMotionDetection = useCallback(() => {
     const video = videoRef.current;
@@ -745,70 +811,6 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       videoRef.current.srcObject = null;
     }
   }, [stream, noMotionTimer]);
-
-  const detectFrameDifference = (currentImageData) => {
-    if (!lastFrameRef.current) {
-      lastFrameRef.current = currentImageData;
-      return { hasMotion: false, intensity: 0 };
-    }
-
-    const currentData = currentImageData.data;
-    const lastData = lastFrameRef.current.data;
-    let diffPixels = 0;
-    let totalDiff = 0;
-    const threshold = 30; // 輝度差分の閾値
-
-    for (let i = 0; i < currentData.length; i += 4) {
-      const rDiff = Math.abs(currentData[i] - lastData[i]);
-      const gDiff = Math.abs(currentData[i + 1] - lastData[i + 1]);
-      const bDiff = Math.abs(currentData[i + 2] - lastData[i + 2]);
-      const avgDiff = (rDiff + gDiff + bDiff) / 3;
-
-      if (avgDiff > threshold) {
-        diffPixels++;
-        totalDiff += avgDiff;
-      }
-    }
-
-    const diffRatio = diffPixels / (currentData.length / 4);
-    const intensity = diffPixels > 0 ? totalDiff / diffPixels : 0; // 平均的な動きの強度
-    lastFrameRef.current = currentImageData;
-    
-    return { 
-      hasMotion: diffRatio > 0.05, // 5%以上の変化があれば動きあり
-      intensity: intensity
-    };
-  };
-
-  // 連続した動きパターンを検出（目薬を取ってさす動作）
-  const checkMotionPattern = () => {
-    const now = Date.now();
-    const history = motionHistoryRef.current;
-    
-    // 30秒以内の動きを保持
-    const recentHistory = history.filter(h => now - h.time < 30000);
-    motionHistoryRef.current = recentHistory;
-    
-    if (recentHistory.length < 3) {
-      return false; // 動きが少なすぎる
-    }
-    
-    // 動きの強度を分析
-    const intensities = recentHistory.map(h => h.intensity);
-    const avgIntensity = intensities.reduce((a, b) => a + b, 0) / intensities.length;
-    
-    // 大きな動き（冷蔵庫を開ける）と小さな動き（目薬をさす）の両方が検出された場合
-    // これは目薬を取ってさす動作パターンと判断
-    const hasLargeMotion = intensities.some(i => i > 50); // 大きな動き
-    const hasSmallMotion = intensities.some(i => i > 0 && i < 50); // 小さな動き
-    
-    if (hasLargeMotion && hasSmallMotion && recentHistory.length >= 3) {
-      console.log('[CameraMonitor] 目薬をさす動作パターンを検出');
-      return true;
-    }
-    
-    return false;
-  };
 
   const formatTime = (ms) => {
     const seconds = Math.floor(ms / 1000);
