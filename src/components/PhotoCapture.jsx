@@ -574,14 +574,36 @@ export function PhotoCapture() {
             <p>読み込み中...</p>
           ) : (
             <div className="photo-grid">
-              {uploadedPhotos.map((photo) => (
-                <div key={photo.id} className="photo-item">
-                  <img src={photo.photoUrl} alt="アップロード済み写真" />
-                  <p className="photo-date">
-                    {photo.timestamp?.toDate?.().toLocaleString('ja-JP') || '日時不明'}
-                  </p>
-                </div>
-              ))}
+              {uploadedPhotos.map((photo) => {
+                // 自撮りモード（複数写真）と通常モード（1枚）の両方に対応
+                const imageUrl = photo.photoUrls && photo.photoUrls.length > 0 
+                  ? photo.photoUrls[0] // 自撮りモード：最初の写真を表示
+                  : photo.photoUrl; // 通常モード：1枚の写真
+                
+                return (
+                  <div key={photo.id} className="photo-item">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt="アップロード済み写真" onError={(e) => {
+                        console.error('[PhotoCapture] 画像読み込みエラー:', imageUrl);
+                        e.target.style.display = 'none';
+                      }} />
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                        画像がありません
+                      </div>
+                    )}
+                    <p className="photo-date">
+                      {photo.timestamp?.toDate?.().toLocaleString('ja-JP') || 
+                       (photo.timestamp instanceof Date ? photo.timestamp.toLocaleString('ja-JP') : '日時不明')}
+                    </p>
+                    {photo.photoUrls && photo.photoUrls.length > 1 && (
+                      <p className="photo-count" style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        {photo.photoUrls.length}枚
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
