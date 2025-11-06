@@ -58,19 +58,82 @@ export async function showNotification(title, options = {}) {
   const useSW = isMobile && isPWA;
   
   try {
+    // Service Worker経由で通知を送信する場合
     if (useSW && 'serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg) {
         console.log('[NotifHelper] Using SW to show notification (mobile PWA)');
+        console.log('[NotifHelper] 通知許可状態:', Notification.permission);
+        
+        // iOS SafariのPWAモードでは、設定で通知を許可していても
+        // Notification.permissionがdeniedと返される場合があるため、
+        // 実際に通知を送信してみて、エラーが発生した場合のみエラーメッセージを表示
         try {
           await reg.showNotification(title, options);
           console.log('[NotifHelper] SW通知送信完了');
           return;
         } catch (swError) {
-          console.error('[NotifHelper] SW通知エラー、直接APIにフォールバック:', swError);
-          // SW経由が失敗した場合、直接APIにフォールバック
+          console.error('[NotifHelper] SW通知エラー:', swError);
+          console.error('[NotifHelper] SW通知エラー詳細:', swError.message, swError.name);
+          
+          // iOS SafariのPWAモードで通知が失敗した場合、設定への案内を表示
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const isPWAStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                                   (window.navigator.standalone === true);
+          
+          let message = `通知が送れません。許可状態: ${Notification.permission}\n\n`;
+          
+          if (isIOS && isPWAStandalone) {
+            message += 'iOSの設定アプリから通知を許可してください:\n';
+            message += '1. 設定アプリを開く\n';
+            message += '2. 「通知」を開く\n';
+            message += '3. 「目薬チェック」アプリを探す\n';
+            message += '4. 通知を「許可」に設定';
+          } else if (isIOS) {
+            message += 'Safariの設定から通知を許可してください:\n';
+            message += '1. 設定アプリを開く\n';
+            message += '2. Safari → 通知\n';
+            message += '3. 「目薬チェック」を見つけて通知を許可';
+          } else {
+            message += 'ブラウザの設定から通知を許可してください:\n';
+            message += 'Chrome: chrome://settings/content/notifications\n';
+            message += 'Safari: 設定 → Safari → 通知';
+          }
+          
+          alert(message);
+          return null;
         }
       }
+    }
+    
+    // 許可状態を確認（Service Worker経由でない場合）
+    if ('Notification' in window && Notification.permission !== 'granted') {
+      console.warn('[NotifHelper] 通知許可が取得されていません。許可状態:', Notification.permission);
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isPWAStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                               (window.navigator.standalone === true);
+      
+      let message = `通知が送れません。許可状態: ${Notification.permission}\n\n`;
+      
+      if (isIOS && isPWAStandalone) {
+        message += 'iOSの設定アプリから通知を許可してください:\n';
+        message += '1. 設定アプリを開く\n';
+        message += '2. 「通知」を開く\n';
+        message += '3. 「目薬チェック」アプリを探す\n';
+        message += '4. 通知を「許可」に設定';
+      } else if (isIOS) {
+        message += 'Safariの設定から通知を許可してください:\n';
+        message += '1. 設定アプリを開く\n';
+        message += '2. Safari → 通知\n';
+        message += '3. 「目薬チェック」を見つけて通知を許可';
+      } else {
+        message += 'ブラウザの設定から通知を許可してください:\n';
+        message += 'Chrome: chrome://settings/content/notifications\n';
+        message += 'Safari: 設定 → Safari → 通知';
+      }
+      
+      alert(message);
+      return null;
     }
     
     // PCまたはSWがない場合、直接Notification APIを使用
