@@ -32,11 +32,23 @@ export function PhotoCapture() {
       });
       setStream(mediaStream);
       
+      // video要素がレンダリングされるまで待つ（最大1秒）
+      let retries = 0;
+      const maxRetries = 10;
+      while (!videoRef.current && retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+      
       if (!videoRef.current) {
-        console.error('[PhotoCapture] video要素が見つかりません');
+        console.error('[PhotoCapture] video要素が見つかりません（タイムアウト）');
         mediaStream.getTracks().forEach(track => track.stop());
+        setStream(null);
+        alert('カメラの初期化に失敗しました。ページをリロードして再度お試しください。');
         return;
       }
+      
+      console.log('[PhotoCapture] video要素を確認:', !!videoRef.current);
       
       // 再生を試みる関数（統一）
       const attemptPlay = async () => {
