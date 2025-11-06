@@ -701,7 +701,7 @@ export function PhotoCapture() {
             }}
             className="photo-btn photo-btn-selfie"
           >
-            📷 自撮りモード（カウントダウン撮影）
+            自撮りモード（カウントダウン撮影）
           </button>
           <button
             onClick={async () => {
@@ -711,7 +711,7 @@ export function PhotoCapture() {
             }}
             className="photo-btn"
           >
-            📸 通常モード（1枚撮影）
+            通常モード（1枚撮影）
           </button>
         </div>
       )}
@@ -867,14 +867,14 @@ export function PhotoCapture() {
             {/* 自撮りモード：カウントダウン撮影ボタン（自撮りモードの場合のみ） */}
             {isSelfieMode && capturedPhotos.length === 0 && countdown === null && !isCapturing && (
               <button onClick={startSelfieCapture} className="photo-btn-capture-selfie" disabled={isCapturing}>
-                📸 撮影
+                撮影
               </button>
             )}
             
             {/* 通常モード：1枚撮影ボタン（通常モードの場合） */}
             {!isSelfieMode && !photoUrl && capturedPhotos.length === 0 && (
               <button onClick={capturePhoto} className="photo-btn-capture">
-                📸 撮影
+                撮影
               </button>
             )}
             
