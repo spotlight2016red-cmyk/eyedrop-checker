@@ -49,7 +49,7 @@ function AppContent() {
   const [banner, setBanner] = useState(null); // { text, slot }
   const [highlightSlot, setHighlightSlot] = useState(null); // 'morning' | 'noon' | 'night' | null
   const [updateAvailable, setUpdateAvailable] = useState(false); // SW更新が利用可能か
-  const processedNotificationsRef = useRef(new Set()); // 処理済み通知IDを追跡
+  const processedNotificationsRef = useRef(new Set()); // 処理済み通知IDを追跡（メモリ用）
 
   const key = useMemo(() => todayKey(), []);
   const day = data[key] ?? { morning: false, noon: false, night: false, note: '' };
@@ -96,6 +96,20 @@ function AppContent() {
       return;
     }
 
+    const processedNotificationsKey = `eyedrop-checker:processed-notifications:${user.uid}`; // localStorage用キー
+
+    // localStorageから処理済み通知IDを読み込む
+    try {
+      const saved = localStorage.getItem(processedNotificationsKey);
+      if (saved) {
+        const savedIds = JSON.parse(saved);
+        processedNotificationsRef.current = new Set(savedIds);
+        console.log('[App] 処理済み通知IDを読み込み:', savedIds.length, '件');
+      }
+    } catch (err) {
+      console.error('[App] 処理済み通知IDの読み込みエラー:', err);
+    }
+
     console.log('[App] 家族通知監視開始:', user.email);
     const q = query(
       collection(db, 'notifications'),
@@ -110,14 +124,49 @@ function AppContent() {
           const notifId = change.doc.id;
           const notif = change.doc.data();
           
-          // 既に処理済みの通知はスキップ
+          // 既に処理済みの通知はスキップ（メモリ + localStorageの両方をチェック）
           if (processedNotificationsRef.current.has(notifId)) {
-            console.log('[App] 既に処理済みの通知をスキップ:', notifId);
+            console.log('[App] 既に処理済みの通知をスキップ（メモリ）:', notifId);
             return;
           }
+
+          // localStorageもチェック（タブ間でも共有）
+          try {
+            const saved = localStorage.getItem(processedNotificationsKey);
+            if (saved) {
+              const savedIds = JSON.parse(saved);
+              if (savedIds.includes(notifId)) {
+                console.log('[App] 既に処理済みの通知をスキップ（localStorage）:', notifId);
+                processedNotificationsRef.current.add(notifId); // メモリにも追加
+                return;
+              }
+            }
+          } catch (err) {
+            console.error('[App] localStorageチェックエラー:', err);
+          }
           
-          // 処理済みフラグを設定
+          // 処理済みフラグを設定（メモリ + localStorage）
           processedNotificationsRef.current.add(notifId);
+          try {
+            const saved = localStorage.getItem(processedNotificationsKey);
+            const savedIds = saved ? JSON.parse(saved) : [];
+            if (!savedIds.includes(notifId)) {
+              savedIds.push(notifId);
+              // 古い通知IDを削除（24時間以上前のもの）
+              const now = Date.now();
+              const cleanedIds = savedIds.filter(id => {
+                // 通知IDからタイムスタンプを抽出できない場合は全て保持
+                // 実際には通知IDそのものはFirestoreのドキュメントIDなので、タイムスタンプは含まれていない
+                // 代わりに、配列のサイズを制限する（最新100件を保持）
+                return true;
+              });
+              const limitedIds = cleanedIds.slice(-100); // 最新100件を保持
+              localStorage.setItem(processedNotificationsKey, JSON.stringify(limitedIds));
+              console.log('[App] 処理済み通知IDを保存:', notifId, '（合計:', limitedIds.length, '件）');
+            }
+          } catch (err) {
+            console.error('[App] localStorage保存エラー:', err);
+          }
           
           console.log('[App] 新しい通知を受信:', notif);
           
