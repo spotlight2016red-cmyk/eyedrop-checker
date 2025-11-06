@@ -52,14 +52,11 @@ export function PhotoCapture() {
     isSwitchingRef.current = true;
     try {
       const next = currentFacing === 'user' ? 'environment' : 'user';
+      const nextSelfieMode = next === 'user';
       console.log('[PhotoCapture] カメラ切替開始:', currentFacing, '→', next);
       
-      // isSelfieModeを同期して維持（user=自撮りモード）
-      setIsSelfieMode(next === 'user');
-      setCurrentFacing(next);
-      
-      // 状態更新を待たずに、直接向きを指定してカメラを起動
-      await startCameraWithFacing(next);
+      // 状態更新を待たずに、直接向きとモードを指定してカメラを起動
+      await startCameraWithFacing(next, nextSelfieMode);
     } finally {
       // 処理完了後にフラグをリセット（少し遅延させて確実に）
       setTimeout(() => {
@@ -69,15 +66,20 @@ export function PhotoCapture() {
   };
 
   // カメラを開始（向きを直接指定可能）
-  const startCameraWithFacing = async (facing = null) => {
+  const startCameraWithFacing = async (facing = null, selfieMode = null) => {
     // 既存ストリームを停止してから開始
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
       setStream(null);
     }
-    const wantFront = facing ? (facing === 'user') : !!isSelfieMode;
+    // facingが指定されている場合はそれを使う、なければselfieModeまたはisSelfieModeから推測
+    const wantFront = facing ? (facing === 'user') : (selfieMode !== null ? selfieMode : !!isSelfieMode);
     const targetFacing = facing || (wantFront ? 'user' : 'environment');
     setCurrentFacing(targetFacing);
+    // selfieModeが指定されている場合は状態も更新
+    if (selfieMode !== null) {
+      setIsSelfieMode(selfieMode);
+    }
     const tryConstraintsInOrder = async () => {
       const trials = [];
       if (wantFront) {
@@ -569,9 +571,8 @@ export function PhotoCapture() {
         <div className="photo-mode-selector">
           <button
             onClick={async () => {
-              setIsSelfieMode(true);
-              // 状態更新を待たずに、直接自撮りモード（前面カメラ）で起動
-              await startCameraWithFacing('user');
+              // 自撮りモード（前面カメラ）で起動、状態も同時に更新
+              await startCameraWithFacing('user', true);
             }}
             className="photo-btn photo-btn-selfie"
           >
@@ -579,9 +580,8 @@ export function PhotoCapture() {
           </button>
           <button
             onClick={async () => {
-              setIsSelfieMode(false);
-              // 状態更新を待たずに、直接通常モード（背面カメラ）で起動
-              await startCameraWithFacing('environment');
+              // 通常モード（背面カメラ）で起動、状態も同時に更新
+              await startCameraWithFacing('environment', false);
             }}
             className="photo-btn"
           >
