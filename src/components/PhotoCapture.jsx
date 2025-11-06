@@ -580,13 +580,32 @@ export function PhotoCapture() {
                   ? photo.photoUrls[0] // 自撮りモード：最初の写真を表示
                   : photo.photoUrl; // 通常モード：1枚の写真
                 
+                console.log('[PhotoCapture] 写真データ:', {
+                  id: photo.id,
+                  photoUrl: photo.photoUrl,
+                  photoUrls: photo.photoUrls,
+                  imageUrl: imageUrl,
+                  mode: photo.mode
+                });
+                
                 return (
                   <div key={photo.id} className="photo-item">
                     {imageUrl ? (
-                      <img src={imageUrl} alt="アップロード済み写真" onError={(e) => {
-                        console.error('[PhotoCapture] 画像読み込みエラー:', imageUrl);
-                        e.target.style.display = 'none';
-                      }} />
+                      <img 
+                        src={imageUrl} 
+                        alt="アップロード済み写真" 
+                        onError={(e) => {
+                          console.error('[PhotoCapture] 画像読み込みエラー:', {
+                            imageUrl,
+                            photoId: photo.id,
+                            photoData: photo
+                          });
+                          e.target.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('[PhotoCapture] 画像読み込み成功:', imageUrl);
+                        }}
+                      />
                     ) : (
                       <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
                         画像がありません
