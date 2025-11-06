@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { collection, addDoc, query, where, getDocs, orderBy, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { storage, db } from '../config/firebase.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import './PhotoCapture.css';
@@ -560,6 +560,47 @@ export function PhotoCapture() {
     }
   };
 
+  // アップロード済み写真を削除
+  const deletePhoto = async (photo) => {
+    if (!confirm('この写真を削除しますか？\n\n削除した写真は復元できません。')) {
+      return;
+    }
+
+    try {
+      // Firebase Storageから画像を削除
+      const urlsToDelete = photo.photoUrls || (photo.photoUrl ? [photo.photoUrl] : []);
+      
+      await Promise.all(
+        urlsToDelete.map(async (url) => {
+          try {
+            // URLからストレージパスを抽出
+            // https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?alt=media&token=...
+            const urlObj = new URL(url);
+            const pathMatch = urlObj.pathname.match(/\/o\/(.+)$/);
+            if (pathMatch) {
+              const decodedPath = decodeURIComponent(pathMatch[1]);
+              const storageRef = ref(storage, decodedPath);
+              await deleteObject(storageRef);
+              console.log('[PhotoCapture] Storageから削除:', decodedPath);
+            }
+          } catch (err) {
+            console.warn('[PhotoCapture] Storage削除エラー（続行）:', err);
+            // 一部の画像が削除できなくても続行
+          }
+        })
+      );
+
+      // Firestoreからドキュメントを削除
+      await deleteDoc(doc(db, 'eyedropPhotos', photo.id));
+      
+      alert('写真を削除しました');
+      await loadUploadedPhotos();
+    } catch (err) {
+      console.error('[PhotoCapture] 削除エラー:', err);
+      alert(`削除に失敗しました: ${err.message || '不明なエラー'}`);
+    }
+  };
+
   // アップロード済み写真を読み込み
   const loadUploadedPhotos = async () => {
     if (!user) return;
@@ -898,6 +939,18 @@ export function PhotoCapture() {
                       {photo.timestamp?.toDate?.().toLocaleString('ja-JP') || 
                        (photo.timestamp instanceof Date ? photo.timestamp.toLocaleString('ja-JP') : '日時不明')}
                     </p>
+                    <button
+                      onClick={() => deletePhoto(photo)}
+                      className="photo-btn-reject"
+                      style={{
+                        width: '100%',
+                        marginTop: '8px',
+                        fontSize: '12px',
+                        padding: '6px 12px'
+                      }}
+                    >
+                      🗑️ 削除
+                    </button>
                     {photo.photoUrls && photo.photoUrls.length > 1 && (
                       <div style={{ marginTop: '8px' }}>
                         <button
