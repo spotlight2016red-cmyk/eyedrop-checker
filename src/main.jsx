@@ -4,6 +4,41 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 
+// グローバルエラーハンドラー（未処理のエラーをキャッチ）
+window.addEventListener('error', (event) => {
+  // ネットワークエラーやリソース読み込みエラーは静かに処理
+  const isNetworkError = event.error?.name === 'AbortError' ||
+                         event.error?.message?.includes('Load failed') ||
+                         event.error?.message?.includes('Fetch is aborted') ||
+                         event.message?.includes('Load failed');
+  
+  if (isNetworkError) {
+    console.warn('[Global] ネットワークエラー（再接続を試みます）:', event.message);
+    return; // ユーザーには通知しない
+  }
+  
+  // その他のエラーは通常通りログに出力
+  console.error('[Global] 未処理のエラー:', event.error || event.message);
+});
+
+// Promise rejection のハンドラー
+window.addEventListener('unhandledrejection', (event) => {
+  const error = event.reason;
+  const isNetworkError = error?.code === 'unavailable' ||
+                        error?.code === 'deadline-exceeded' ||
+                        error?.message?.includes('transport errored') ||
+                        error?.message?.includes('Fetch is aborted') ||
+                        error?.name === 'AbortError';
+  
+  if (isNetworkError) {
+    console.warn('[Global] Promise rejection（ネットワークエラー）:', error.code || error.name);
+    event.preventDefault(); // デフォルトのエラー処理を防ぐ
+    return;
+  }
+  
+  console.error('[Global] 未処理のPromise rejection:', error);
+});
+
 // Lightweight mobile console (eruda) auto-loader
 (() => {
   try {

@@ -140,8 +140,24 @@ export function PhotoCapture() {
       };
       
       videoRef.current.onerror = (e) => {
-        console.error('[PhotoCapture] video要素エラー:', e);
-        alert(`動画の再生に失敗しました: ${videoRef.current?.error?.message || 'エラーが発生しました'}`);
+        const error = videoRef.current?.error;
+        const errorCode = error?.code;
+        const errorMessage = error?.message || 'エラーが発生しました';
+        
+        // 一時的なエラー（ネットワークエラーなど）は静かに処理
+        // MEDIA_ERR_SRC_NOT_SUPPORTED (4) や MEDIA_ERR_NETWORK (2) は再試行可能
+        if (errorCode === 2 || errorCode === 4) {
+          console.warn('[PhotoCapture] 動画読み込みエラー（再試行可能）:', errorCode, errorMessage);
+          // 自動再試行はしない（ユーザーが手動で再試行する）
+        } else {
+          console.error('[PhotoCapture] video要素エラー:', errorCode, errorMessage, e);
+          // 重大なエラーのみアラートを表示
+          if (errorCode === 1) { // MEDIA_ERR_ABORTED
+            console.warn('[PhotoCapture] 動画読み込みが中断されました（再試行してください）');
+          } else {
+            alert(`動画の再生に失敗しました: ${errorMessage}`);
+          }
+        }
       };
       
     } catch (err) {

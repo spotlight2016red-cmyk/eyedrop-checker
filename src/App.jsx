@@ -117,9 +117,10 @@ function AppContent() {
       where('read', '==', false)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log('[App] 通知スナップショット更新:', snapshot.size, '件');
-      snapshot.docChanges().forEach((change) => {
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        console.log('[App] 通知スナップショット更新:', snapshot.size, '件');
+        snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const notifId = change.doc.id;
           const notif = change.doc.data();
@@ -212,9 +213,23 @@ function AppContent() {
           }
         }
       });
-    }, (error) => {
-      console.error('[App] 通知監視エラー:', error);
-    });
+      }, 
+      (error) => {
+        // ネットワークエラーや接続エラーは静かに処理（Firestoreが自動的に再接続を試みる）
+        const isNetworkError = error?.code === 'unavailable' || 
+                               error?.code === 'deadline-exceeded' ||
+                               error?.message?.includes('transport errored') ||
+                               error?.message?.includes('Fetch is aborted') ||
+                               error?.name === 'AbortError';
+        
+        if (isNetworkError) {
+          console.warn('[App] Firestore接続エラー（再接続を試みます）:', error.code || error.name);
+          // Firestoreが自動的に再接続を試みるため、ユーザーには通知しない
+        } else {
+          console.error('[App] 通知監視エラー:', error);
+        }
+      }
+    );
 
     return () => {
       console.log('[App] 家族通知監視を停止');
