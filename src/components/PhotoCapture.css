@@ -304,6 +304,20 @@
     font-size: 11px;
     padding: 8px;
   }
+  
+  .photo-btn-nav {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+  
+  .photo-btn-nav-prev {
+    left: 8px;
+  }
+  
+  .photo-btn-nav-next {
+    right: 8px;
+  }
 }
 
 @keyframes countdown-pulse {
@@ -354,6 +368,42 @@
   z-index: 10;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* 前/次ボタン */
+.photo-btn-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  transition: all 0.2s;
+  backdrop-filter: blur(4px);
+}
+
+.photo-btn-nav:hover {
+  background: rgba(59, 130, 246, 0.8);
+  border-color: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.photo-btn-nav-prev {
+  left: 16px;
+}
+
+.photo-btn-nav-next {
+  right: 16px;
 }
 
 .photo-playback-image {

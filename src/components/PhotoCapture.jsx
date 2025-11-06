@@ -225,6 +225,26 @@ export function PhotoCapture() {
     stopPlayback();
     setCurrentPhotoIndex(0);
   };
+  
+  // 前の写真に移動
+  const goToPreviousPhoto = () => {
+    stopPlayback(); // 再生中なら停止
+    if (currentPhotoIndex > 0) {
+      setCurrentPhotoIndex(currentPhotoIndex - 1);
+    } else {
+      setCurrentPhotoIndex(capturedPhotos.length - 1); // 最初なら最後に
+    }
+  };
+  
+  // 次の写真に移動
+  const goToNextPhoto = () => {
+    stopPlayback(); // 再生中なら停止
+    if (currentPhotoIndex < capturedPhotos.length - 1) {
+      setCurrentPhotoIndex(currentPhotoIndex + 1);
+    } else {
+      setCurrentPhotoIndex(0); // 最後なら最初に
+    }
+  };
 
   // OKボタン：アップロード
   const confirmAndUpload = async () => {
@@ -464,6 +484,22 @@ export function PhotoCapture() {
             {/* 再生画面 */}
             {capturedPhotos.length > 0 && !isCapturing && (
               <div className="photo-playback">
+                {/* 前/次ボタン（画像の左右） */}
+                <button
+                  onClick={goToPreviousPhoto}
+                  className="photo-btn-nav photo-btn-nav-prev"
+                  aria-label="前の写真"
+                >
+                  ◀
+                </button>
+                <button
+                  onClick={goToNextPhoto}
+                  className="photo-btn-nav photo-btn-nav-next"
+                  aria-label="次の写真"
+                >
+                  ▶
+                </button>
+                
                 <img 
                   src={capturedPhotos[currentPhotoIndex]} 
                   alt={`撮影した写真 ${currentPhotoIndex + 1}/${capturedPhotos.length}`}
