@@ -284,7 +284,21 @@ export function PhotoCapture() {
       }));
       setUploadedPhotos(photos);
     } catch (err) {
-      console.error('写真読み込みエラー:', err);
+      // 権限エラーの場合は警告を表示（初回のみ）
+      const isPermissionError = err.code === 'permission-denied' || 
+                                 err.code === 'permissions-error' ||
+                                 err.message?.includes('permissions') ||
+                                 err.message?.includes('Missing or insufficient permissions');
+      
+      if (isPermissionError) {
+        console.warn('[PhotoCapture] Firestoreの読み取り権限がありません。Firestoreのセキュリティルールを確認してください。', err);
+        // エラーを静かに処理（ユーザーに通知しない）
+        setUploadedPhotos([]);
+      } else {
+        console.error('[PhotoCapture] 写真読み込みエラー:', err);
+        // その他のエラーも静かに処理
+        setUploadedPhotos([]);
+      }
     } finally {
       setLoading(false);
     }
