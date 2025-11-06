@@ -160,12 +160,127 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         setCameraStatus(prev => ({ ...prev, hasSrcObject: true }));
         setStream(mediaStream);
         
-        // 再生を開始
-        if (videoRef.current.paused) {
-          videoRef.current.play().catch(err => {
-            console.error('[CameraMonitor] 再生エラー:', err);
+        // video要素のイベントを監視
+        videoRef.current.onloadedmetadata = () => {
+          console.log('[CameraMonitor] メタデータ読み込み完了');
+          console.log('[CameraMonitor] 動画サイズ:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+          setCameraStatus({
+            width: videoRef.current?.videoWidth || 0,
+            height: videoRef.current?.videoHeight || 0,
+            readyState: videoRef.current?.readyState || 0,
+            error: null,
+            paused: videoRef.current?.paused ?? true,
+            hasSrcObject: !!videoRef.current?.srcObject
           });
-        }
+          
+          // メタデータ読み込み後、再生を開始
+          if (videoRef.current && videoRef.current.paused) {
+            console.log('[CameraMonitor] メタデータ読み込み後、再生を開始');
+            videoRef.current.play().then(() => {
+              console.log('[CameraMonitor] 再生成功');
+              setCameraStatus(prev => ({ ...prev, paused: false }));
+            }).catch(err => {
+              console.error('[CameraMonitor] メタデータ読み込み後の再生エラー:', err);
+            });
+          }
+        };
+        
+        videoRef.current.oncanplay = () => {
+          console.log('[CameraMonitor] 動画再生可能');
+          setCameraStatus(prev => ({
+            ...prev,
+            readyState: videoRef.current?.readyState || 0,
+            paused: videoRef.current?.paused ?? true,
+            hasSrcObject: !!videoRef.current?.srcObject
+          }));
+          // 再生を再試行
+          if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().then(() => {
+              console.log('[CameraMonitor] oncanplay後の再生成功');
+              setCameraStatus(prev => ({ ...prev, paused: false }));
+            }).catch(err => {
+              console.error('[CameraMonitor] oncanplay後の再生エラー:', err);
+            });
+          }
+        };
+        
+        videoRef.current.onplay = () => {
+          console.log('[CameraMonitor] 動画再生開始');
+          setCameraStatus(prev => ({ ...prev, paused: false }));
+        };
+        
+        videoRef.current.onpause = () => {
+          console.log('[CameraMonitor] 動画再生停止');
+          setCameraStatus(prev => ({ ...prev, paused: true }));
+        };
+        
+        videoRef.current.onerror = (e) => {
+          console.error('[CameraMonitor] video要素エラー:', e);
+          setCameraStatus(prev => ({
+            ...prev,
+            error: videoRef.current?.error?.message || 'エラーが発生しました',
+            hasSrcObject: !!videoRef.current?.srcObject
+          }));
+        };
+        
+        // 定期的に状態を更新
+        const statusInterval = setInterval(() => {
+          if (videoRef.current) {
+            const hasMetadata = videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0;
+            const currentReadyState = videoRef.current.readyState;
+            
+            setCameraStatus({
+              width: videoRef.current.videoWidth || 0,
+              height: videoRef.current.videoHeight || 0,
+              readyState: hasMetadata && currentReadyState === 0 ? 1 : currentReadyState,
+              error: videoRef.current.error ? videoRef.current.error.message : null,
+              paused: videoRef.current.paused,
+              hasSrcObject: !!videoRef.current.srcObject
+            });
+            
+            // 再生状態を確認して、停止している場合は再開
+            if (videoRef.current.paused && videoRef.current.readyState >= 2) {
+              console.log('[CameraMonitor] 動画が停止しているため再開');
+              videoRef.current.play().catch(err => {
+                console.error('[CameraMonitor] 自動再生エラー:', err);
+              });
+            }
+          }
+        }, 1000);
+        
+        // クリーンアップ関数を保存
+        videoRef.current._statusInterval = statusInterval;
+        
+        // 再生を開始（複数回試行）
+        const tryPlay = async () => {
+          if (!videoRef.current) return;
+          
+          try {
+            await videoRef.current.play();
+            console.log('[CameraMonitor] 動画再生開始成功');
+            setCameraStatus(prev => ({ ...prev, paused: false }));
+          } catch (playError) {
+            console.error('[CameraMonitor] 動画再生エラー:', playError);
+            // 再生に失敗した場合、少し待ってから再試行
+            setTimeout(() => {
+              if (videoRef.current && videoRef.current.paused) {
+                console.log('[CameraMonitor] 再生再試行');
+                tryPlay();
+              }
+            }, 1000);
+          }
+        };
+        
+        // すぐに再生を試行
+        tryPlay();
+        
+        // 少し待ってから動き検出を開始（カメラが安定するまで）
+        setTimeout(() => {
+          if (isActive && videoRef.current && canvasRef.current) {
+            console.log('[CameraMonitor] 動き検出を開始');
+            startMotionDetection();
+          }
+        }, 500);
       } catch (err) {
         console.error('[CameraMonitor] カメラアクセスエラー:', err);
         alert('カメラへのアクセスが許可されていません。ブラウザの設定からカメラへのアクセスを許可してください。');
