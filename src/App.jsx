@@ -126,7 +126,7 @@ function AppContent() {
           
           // 既に処理済みの通知はスキップ（メモリ + localStorageの両方をチェック）
           if (processedNotificationsRef.current.has(notifId)) {
-            console.log('[App] 既に処理済みの通知をスキップ（メモリ）:', notifId);
+            // スキップログは出力しない（コンソールが煩雑になるため）
             return;
           }
 
@@ -136,7 +136,7 @@ function AppContent() {
             if (saved) {
               const savedIds = JSON.parse(saved);
               if (savedIds.includes(notifId)) {
-                console.log('[App] 既に処理済みの通知をスキップ（localStorage）:', notifId);
+                // スキップログは出力しない（コンソールが煩雑になるため）
                 processedNotificationsRef.current.add(notifId); // メモリにも追加
                 return;
               }
@@ -149,26 +149,17 @@ function AppContent() {
           processedNotificationsRef.current.add(notifId);
           try {
             const saved = localStorage.getItem(processedNotificationsKey);
-            const savedIds = saved ? JSON.parse(saved) : [];
-            if (!savedIds.includes(notifId)) {
-              savedIds.push(notifId);
-              // 古い通知IDを削除（24時間以上前のもの）
-              const now = Date.now();
-              const cleanedIds = savedIds.filter(id => {
-                // 通知IDからタイムスタンプを抽出できない場合は全て保持
-                // 実際には通知IDそのものはFirestoreのドキュメントIDなので、タイムスタンプは含まれていない
-                // 代わりに、配列のサイズを制限する（最新100件を保持）
-                return true;
-              });
-              const limitedIds = cleanedIds.slice(-100); // 最新100件を保持
-              localStorage.setItem(processedNotificationsKey, JSON.stringify(limitedIds));
-              console.log('[App] 処理済み通知IDを保存:', notifId, '（合計:', limitedIds.length, '件）');
-            }
+              const savedIds = saved ? JSON.parse(saved) : [];
+              if (!savedIds.includes(notifId)) {
+                savedIds.push(notifId);
+                // 配列のサイズを制限する（最新100件を保持）
+                const limitedIds = savedIds.slice(-100);
+                localStorage.setItem(processedNotificationsKey, JSON.stringify(limitedIds));
+                console.log('[App] 新しい通知を処理:', notifId, '（処理済み:', limitedIds.length, '件）');
+              }
           } catch (err) {
             console.error('[App] localStorage保存エラー:', err);
           }
-          
-          console.log('[App] 新しい通知を受信:', notif);
           
           // 通知を送信（カメラ監視からの通知か、家族からの通知かを判定）
           const notificationTitle = notif.type === 'camera-alert' 
