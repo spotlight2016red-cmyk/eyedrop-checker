@@ -501,8 +501,8 @@ export function PhotoCapture() {
               </div>
             )}
 
-            {/* ビデオ表示（カウントダウンや再生中でない場合） */}
-            {countdown === null && !isCapturing && capturedPhotos.length === 0 && !photoUrl && (
+            {/* ビデオ表示（常に表示、オーバーレイでカウントダウンや撮影中を表示） */}
+            {capturedPhotos.length === 0 && !photoUrl && (
               <video
                 ref={videoRef}
                 autoPlay
