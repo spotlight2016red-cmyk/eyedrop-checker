@@ -703,6 +703,27 @@ function AppContent() {
             style={{ fontSize: '12px', padding: '6px 12px', marginLeft: '8px' }}
           >更新バナーテスト</button>
         </div>
+        {/* デバッグ: モバイルコンソール切替（PWAでも使える） */}
+        <div className="settings-row" style={{ marginTop: '12px' }}>
+          <button
+            className="btn"
+            onClick={() => {
+              try {
+                const on = localStorage.getItem('eruda') === 'on';
+                if (on) {
+                  localStorage.removeItem('eruda');
+                  alert('デバッグコンソールをOFFにしました。再読み込みします。');
+                } else {
+                  localStorage.setItem('eruda', 'on');
+                  alert('デバッグコンソールをONにしました。再読み込みします。');
+                }
+                window.location.reload();
+              } catch {}
+            }}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
+          >{(typeof localStorage !== 'undefined' && localStorage.getItem('eruda') === 'on') ? 'デバッグコンソールをOFF' : 'デバッグコンソールをON'}</button>
+          <span className="hint" style={{ marginLeft: '8px' }}>（PWAでURLが出ない場合はここで切替）</span>
+        </div>
         <div className="time-grid">
           {SLOTS.map(s => (
             <label key={s.id} className="time-item">

@@ -1,4 +1,4 @@
-const CACHE = 'eyedrop-cache-v5';
+const CACHE = 'eyedrop-cache-v6';
 const ASSETS = [
   '/',
   '/index.html',
