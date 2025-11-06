@@ -45,21 +45,21 @@ export function PhotoCapture() {
     const next = currentFacing === 'user' ? 'environment' : 'user';
     // isSelfieModeを同期して維持（user=自撮りモード）
     setIsSelfieMode(next === 'user');
-    // state更新の反映後に再起動
-    setTimeout(() => {
-      startCamera();
-    }, 10);
+    setCurrentFacing(next);
+    // 状態更新を待たずに、直接向きを指定してカメラを起動
+    await startCameraWithFacing(next);
   };
 
-  // カメラを開始
-  const startCamera = async () => {
+  // カメラを開始（向きを直接指定可能）
+  const startCameraWithFacing = async (facing = null) => {
     // 既存ストリームを停止してから開始
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
       setStream(null);
     }
-    const wantFront = !!isSelfieMode;
-    setCurrentFacing(wantFront ? 'user' : 'environment');
+    const wantFront = facing ? (facing === 'user') : !!isSelfieMode;
+    const targetFacing = facing || (wantFront ? 'user' : 'environment');
+    setCurrentFacing(targetFacing);
     const tryConstraintsInOrder = async () => {
       const trials = [];
       if (wantFront) {
@@ -184,6 +184,9 @@ export function PhotoCapture() {
       alert('カメラへのアクセスが許可されていません。ブラウザの設定からカメラへのアクセスを許可してください。');
     }
   };
+
+  // カメラを開始（既存コードとの互換性のため）
+  const startCamera = () => startCameraWithFacing(null);
 
   // カメラを停止
   const stopCamera = () => {
