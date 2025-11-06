@@ -728,14 +728,14 @@ export function PhotoCapture() {
             {/* 自撮りモード：カウントダウン撮影ボタン */}
             {isSelfieMode && capturedPhotos.length === 0 && countdown === null && !isCapturing && (
               <button onClick={startSelfieCapture} className="photo-btn-capture-selfie" disabled={isCapturing}>
-                📸 カウントダウン撮影
+                📸 撮影
               </button>
             )}
             
             {/* 通常モード：1枚撮影ボタン */}
             {isSelfieMode === false && !photoUrl && (
               <button onClick={capturePhoto} className="photo-btn-capture">
-                📸 写真を撮る
+                📸 撮影
               </button>
             )}
             
