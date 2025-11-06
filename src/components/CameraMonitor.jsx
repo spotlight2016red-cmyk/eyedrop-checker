@@ -273,14 +273,6 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         
         // すぐに再生を試行
         tryPlay();
-        
-        // 少し待ってから動き検出を開始（カメラが安定するまで）
-        setTimeout(() => {
-          if (isActive && videoRef.current && canvasRef.current) {
-            console.log('[CameraMonitor] 動き検出を開始');
-            startMotionDetection();
-          }
-        }, 500);
       } catch (err) {
         console.error('[CameraMonitor] カメラアクセスエラー:', err);
         alert('カメラへのアクセスが許可されていません。ブラウザの設定からカメラへのアクセスを許可してください。');
@@ -369,6 +361,25 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isActive, testMode, onNoMotion]);
+
+  // streamが設定された後に動き検出を開始
+  useEffect(() => {
+    if (!isActive || !stream || !videoRef.current || !canvasRef.current) return;
+    
+    console.log('[CameraMonitor] streamが設定されました。動き検出を開始します');
+    
+    // 少し待ってから動き検出を開始（カメラが安定するまで）
+    const timer = setTimeout(() => {
+      if (isActive && videoRef.current && canvasRef.current && stream) {
+        console.log('[CameraMonitor] 動き検出を開始');
+        startMotionDetection();
+      }
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isActive, stream, startMotionDetection]);
 
   const startMotionDetection = useCallback(() => {
     const video = videoRef.current;
@@ -734,154 +745,6 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
       videoRef.current.srcObject = null;
     }
   }, [stream, noMotionTimer]);
-
-  const startMotionDetection = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    const ctx = canvas.getContext('2d');
-
-    // setIntervalを使用してバックグラウンドでも動き検出を続ける
-    const detectMotion = () => {
-      // ページが非表示の場合は、動き検出はできないがタイマーは継続
-      if (document.hidden) {
-        console.log('[CameraMonitor] ページが非表示のため動き検出をスキップ（タイマーは継続）');
-        return;
-      }
-
-      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        return;
-      }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const motionResult = detectFrameDifference(imageData);
-      const hasMotion = motionResult.hasMotion;
-      const intensity = motionResult.intensity;
-
-      if (hasMotion) {
-        // 動きの履歴を記録
-        motionHistoryRef.current.push({
-          time: Date.now(),
-          intensity: intensity
-        });
-        
-        // 連続した動きパターンを検出（目薬を取ってさす動作）
-        const isEyedropPattern = checkMotionPattern();
-        
-        if (isEyedropPattern) {
-          // 目薬をさす動作パターンを検出した場合、タイマーをリセット
-          console.log('[CameraMonitor] ✅ 目薬をさす動作パターンを検出、タイマーをリセット');
-          setMotionCount(prev => prev + 1);
-          if (onMotionDetected) onMotionDetected();
-          
-          // UIにパターン検出を表示（3秒間）
-          setPatternDetected(true);
-          setTimeout(() => {
-            setPatternDetected(false);
-          }, 3000);
-          
-          // タイマーをリセット
-          if (noMotionTimer) {
-            clearTimeout(noMotionTimer);
-            setNoMotionTimer(null);
-          }
-          noMotionStartTimeRef.current = null;
-          setNoMotionStartTime(null);
-          setRemainingTime(null);
-          noMotionNotifiedRef.current = false; // 通知フラグをリセット
-          
-          // 動きの履歴をクリア
-          motionHistoryRef.current = [];
-        } else {
-          // 動きが検出された場合、タイマーをリセット（パターン検出ではない場合でも）
-          // ただし、動き検出回数は増やす
-          setMotionCount(prev => prev + 1);
-          
-          // タイマーが開始されている場合のみリセット（最初の動き検出ではリセットしない）
-          if (noMotionStartTimeRef.current) {
-            console.log('[CameraMonitor] 動き検出: タイマーをリセット');
-            if (noMotionTimer) {
-              clearTimeout(noMotionTimer);
-              setNoMotionTimer(null);
-            }
-            noMotionStartTimeRef.current = null;
-            setNoMotionStartTime(null);
-            setRemainingTime(null);
-            noMotionNotifiedRef.current = false; // 通知フラグをリセット
-          }
-        }
-      } else {
-        // 既に通知を送った場合は、動きが検出されるまで処理をスキップ
-        if (noMotionNotifiedRef.current) {
-          return; // 早期リターンで以降の処理をスキップ
-        }
-        
-        // 動きが検出されない場合、タイマーを開始
-        const now = Date.now();
-        
-        // 最初のフレームは除外（lastFrameRefがnullの場合）
-        if (!lastFrameRef.current) {
-          animationFrameRef.current = requestAnimationFrame(detectMotion);
-          return;
-        }
-        
-        // 動きがない状態が始まった時刻を記録（useRefで最新値を保持）
-        if (!noMotionStartTimeRef.current) {
-          console.log('[CameraMonitor] 動きなしタイマー開始, 残り時間:', NO_MOTION_THRESHOLD);
-          noMotionStartTimeRef.current = now;
-          setNoMotionStartTime(now);
-          // 即座に残り時間を設定
-          setRemainingTime(NO_MOTION_THRESHOLD);
-        }
-        
-        // 毎回残り時間を更新（カウントダウンを確実に進める）
-        if (noMotionStartTimeRef.current) {
-          const elapsed = now - noMotionStartTimeRef.current;
-          const remaining = Math.max(0, NO_MOTION_THRESHOLD - elapsed);
-          setRemainingTime(remaining);
-          
-          // 残り時間が0になったら通知を送信（重複を防ぐ）
-          if (remaining === 0 && !noMotionNotifiedRef.current) {
-            console.log('[CameraMonitor] 動きなしタイマー完了（残り時間0）');
-            noMotionNotifiedRef.current = true; // 通知フラグを設定（最初に設定）
-            if (onNoMotion) onNoMotion();
-            // 通知を送った後は、動きが検出されるまで待つ
-            return; // 早期リターンで以降の処理をスキップ
-          }
-        }
-        
-        // タイマーが設定されていない場合、設定する（remaining > 0の場合のみ）
-        if (!noMotionTimer && noMotionStartTimeRef.current && !noMotionNotifiedRef.current) {
-          const elapsed = now - noMotionStartTimeRef.current;
-          const remaining = NO_MOTION_THRESHOLD - elapsed;
-          
-          if (remaining > 0) {
-            const timer = setTimeout(() => {
-              console.log('[CameraMonitor] 動きなしタイマー完了');
-              if (!noMotionNotifiedRef.current) {
-                noMotionNotifiedRef.current = true; // 通知フラグを設定
-                if (onNoMotion) onNoMotion();
-              }
-              setNoMotionTimer(null);
-              // タイマーはクリアしない（次の動き検出まで待つ）
-            }, remaining);
-            setNoMotionTimer(timer);
-          }
-        }
-      }
-    };
-
-    // 1秒ごとに動き検出を実行（バックグラウンドでもタイマーは継続）
-    intervalRef.current = setInterval(detectMotion, 1000);
-    
-    // 初回実行
-    detectMotion();
-  };
 
   const detectFrameDifference = (currentImageData) => {
     if (!lastFrameRef.current) {
