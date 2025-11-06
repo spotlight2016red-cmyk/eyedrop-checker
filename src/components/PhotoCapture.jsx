@@ -628,6 +628,9 @@ export function PhotoCapture() {
                 <div className="photo-playback-info">
                   {currentPhotoIndex + 1} / {capturedPhotos.length}
                 </div>
+                <div style={{ fontSize: '12px', color: '#fff', textAlign: 'center', marginBottom: '8px', padding: '0 16px', lineHeight: '1.5' }}>
+                  📌 矢印で写真を確認 → 気に入った写真を選択 → OKでアップロード
+                </div>
                 <div className="photo-playback-controls">
                   {!isPlaying ? (
                     <>
@@ -681,6 +684,9 @@ export function PhotoCapture() {
             {isSelfieMode === false && photoUrl && capturedPhotos.length === 0 && (
               <div className="photo-preview">
                 <img src={photoUrl} alt="撮影した写真" />
+                <div style={{ fontSize: '12px', color: '#fff', textAlign: 'center', marginBottom: '12px', padding: '0 16px', lineHeight: '1.5' }}>
+                  📌 写真を確認して、アップロードまたはやり直しを選択してください
+                </div>
                 <div className="photo-preview-actions">
                   <button
                     onClick={() => setPhotoUrl(null)}
