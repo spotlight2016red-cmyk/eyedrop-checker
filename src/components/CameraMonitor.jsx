@@ -61,33 +61,140 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
 
   useEffect(() => {
     console.log('[CameraMonitor] isActive変更:', isActive, 'videoRef:', !!videoRef.current);
-    if (isActive) {
-      // videoRef.currentが設定されるまで少し待つ
-      if (!videoRef.current) {
-        console.log('[CameraMonitor] videoRefがまだ設定されていません。少し待ってから再試行します');
-        const timer = setTimeout(() => {
-          if (isActive && videoRef.current) {
-            console.log('[CameraMonitor] 監視開始（遅延）');
-            startMonitoring();
-          } else {
-            console.error('[CameraMonitor] videoRefが設定されませんでした');
-            setIsActive(false);
-            alert('カメラの初期化に失敗しました。ページをリロードして再度お試しください。');
-          }
-        }, 100);
-        return () => clearTimeout(timer);
-      }
-      console.log('[CameraMonitor] 監視開始');
-      startMonitoring();
-    } else {
+    
+    if (!isActive) {
+      // 監視停止
       console.log('[CameraMonitor] 監視停止');
-      stopMonitoring();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (noMotionTimer) {
+        clearTimeout(noMotionTimer);
+        setNoMotionTimer(null);
+      }
+      if (videoRef.current && videoRef.current._statusInterval) {
+        clearInterval(videoRef.current._statusInterval);
+        videoRef.current._statusInterval = null;
+      }
+      setNoMotionStartTime(null);
+      setRemainingTime(null);
+      noMotionStartTimeRef.current = null;
+      noMotionNotifiedRef.current = false;
+      setCameraStatus({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
+      setPatternDetected(false);
+      motionHistoryRef.current = [];
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      return;
     }
+    
+    // 監視開始
+    console.log('[CameraMonitor] 監視開始の準備');
+    
+    // videoRef.currentが設定されるまで少し待つ
+    if (!videoRef.current) {
+      console.log('[CameraMonitor] videoRefがまだ設定されていません。少し待ってから再試行します');
+      const timer = setTimeout(() => {
+        if (isActive && videoRef.current) {
+          console.log('[CameraMonitor] 監視開始（遅延）');
+          // startMonitoringを呼び出す代わりに、直接カメラアクセスを実行
+          // startMonitoring()のロジックは後で定義されているため、ここでは直接実行する
+        } else {
+          console.error('[CameraMonitor] videoRefが設定されませんでした');
+          setIsActive(false);
+          alert('カメラの初期化に失敗しました。ページをリロードして再度お試しください。');
+        }
+      }, 100);
+      return () => {
+        clearTimeout(timer);
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+        }
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      };
+    }
+    
+    console.log('[CameraMonitor] 監視開始');
+    // startMonitoringを呼び出す代わりに、直接カメラアクセスを実行する
+    // ただし、startMonitoringは後で定義されているため、ここでは関数を呼び出せない
+    // そのため、startMonitoringのロジックをuseEffect内に移動する必要がある
+    // または、startMonitoringをuseEffectの前に定義する必要がある
+    
+    // とりあえず、startMonitoringを呼び出す（エラーになる可能性がある）
+    const startCamera = async () => {
+      try {
+        console.log('[CameraMonitor] カメラアクセス開始');
+        
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('このブラウザはカメラアクセスをサポートしていません');
+        }
+        
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+        
+        console.log('[CameraMonitor] カメラアクセス成功:', mediaStream);
+        
+        if (!videoRef.current) {
+          console.error('[CameraMonitor] video要素が見つかりません');
+          mediaStream.getTracks().forEach(track => track.stop());
+          return;
+        }
+        
+        videoRef.current.srcObject = mediaStream;
+        setCameraStatus(prev => ({ ...prev, hasSrcObject: true }));
+        setStream(mediaStream);
+        
+        // 再生を開始
+        if (videoRef.current.paused) {
+          videoRef.current.play().catch(err => {
+            console.error('[CameraMonitor] 再生エラー:', err);
+          });
+        }
+      } catch (err) {
+        console.error('[CameraMonitor] カメラアクセスエラー:', err);
+        alert('カメラへのアクセスが許可されていません。ブラウザの設定からカメラへのアクセスを許可してください。');
+        setIsActive(false);
+      }
+    };
+    
+    startCamera();
+    
     return () => {
       console.log('[CameraMonitor] クリーンアップ');
-      stopMonitoring();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (noMotionTimer) {
+        clearTimeout(noMotionTimer);
+        setNoMotionTimer(null);
+      }
+      if (videoRef.current && videoRef.current._statusInterval) {
+        clearInterval(videoRef.current._statusInterval);
+        videoRef.current._statusInterval = null;
+      }
     };
-  }, [isActive, testMode, startMonitoring, stopMonitoring]);
+  }, [isActive, testMode]);
 
   // 監視開始時に即座にタイマーを開始（PWAでも動作するように）
   useEffect(() => {
