@@ -1,4 +1,4 @@
-const CACHE = 'eyedrop-cache-v4';
+const CACHE = 'eyedrop-cache-v5';
 const ASSETS = [
   '/',
   '/index.html',
@@ -32,9 +32,30 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin === self.location.origin) {
-    e.respondWith(
-      caches.match(e.request).then(res => res || fetch(e.request))
-    );
+    // アセットファイル（ハッシュ付きJS/CSS）は常にネットワークから取得し、キャッシュしない
+    // これにより、ビルド後のファイル名が変わっても正しく取得できる
+    if (url.pathname.startsWith('/assets/')) {
+      e.respondWith(
+        fetch(e.request).catch(() => {
+          // ネットワークリクエストが失敗した場合のみキャッシュを返す
+          return caches.match(e.request);
+        })
+      );
+    } else {
+      // その他のファイルはキャッシュ優先、なければネットワーク
+      e.respondWith(
+        caches.match(e.request).then(res => res || fetch(e.request).then(response => {
+          // 成功したレスポンスをキャッシュに保存（アセットファイル以外）
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE).then(cache => {
+              cache.put(e.request, clone);
+            });
+          }
+          return response;
+        }))
+      );
+    }
   }
 });
 
