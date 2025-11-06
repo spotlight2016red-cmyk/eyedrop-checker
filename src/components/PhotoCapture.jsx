@@ -240,6 +240,11 @@ export function PhotoCapture() {
       alert('まずカメラを開始してください');
       return;
     }
+    // 自撮りモードでない場合は通常撮影にフォールバック
+    if (!isSelfieMode) {
+      capturePhoto();
+      return;
+    }
     setIsCapturing(true);
     setCapturedPhotos([]);
     setCurrentPhotoIndex(0);
@@ -563,18 +568,20 @@ export function PhotoCapture() {
       {!stream && (
         <div className="photo-mode-selector">
           <button
-            onClick={() => {
+            onClick={async () => {
               setIsSelfieMode(true);
-              startCamera();
+              // 状態更新を待たずに、直接自撮りモード（前面カメラ）で起動
+              await startCameraWithFacing('user');
             }}
             className="photo-btn photo-btn-selfie"
           >
             📷 自撮りモード（カウントダウン撮影）
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
               setIsSelfieMode(false);
-              startCamera();
+              // 状態更新を待たずに、直接通常モード（背面カメラ）で起動
+              await startCameraWithFacing('environment');
             }}
             className="photo-btn"
           >
