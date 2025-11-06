@@ -27,6 +27,7 @@ export function PhotoCapture() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null); // 選択した写真のインデックス
   const playbackIntervalRef = useRef(null);
+  const isSwitchingRef = useRef(false); // カメラ切替処理中フラグ
 
   // 指定パターンのカメラdeviceIdを推定
   const pickCameraByLabel = async (pattern) => {
@@ -42,12 +43,29 @@ export function PhotoCapture() {
 
   // カメラの前面/背面を切り替え
   const switchCamera = async () => {
-    const next = currentFacing === 'user' ? 'environment' : 'user';
-    // isSelfieModeを同期して維持（user=自撮りモード）
-    setIsSelfieMode(next === 'user');
-    setCurrentFacing(next);
-    // 状態更新を待たずに、直接向きを指定してカメラを起動
-    await startCameraWithFacing(next);
+    // 既に処理中の場合は無視
+    if (isSwitchingRef.current) {
+      console.log('[PhotoCapture] カメラ切替処理中、スキップ');
+      return;
+    }
+    
+    isSwitchingRef.current = true;
+    try {
+      const next = currentFacing === 'user' ? 'environment' : 'user';
+      console.log('[PhotoCapture] カメラ切替開始:', currentFacing, '→', next);
+      
+      // isSelfieModeを同期して維持（user=自撮りモード）
+      setIsSelfieMode(next === 'user');
+      setCurrentFacing(next);
+      
+      // 状態更新を待たずに、直接向きを指定してカメラを起動
+      await startCameraWithFacing(next);
+    } finally {
+      // 処理完了後にフラグをリセット（少し遅延させて確実に）
+      setTimeout(() => {
+        isSwitchingRef.current = false;
+      }, 500);
+    }
   };
 
   // カメラを開始（向きを直接指定可能）

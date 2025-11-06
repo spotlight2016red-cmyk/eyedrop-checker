@@ -54,34 +54,33 @@ window.addEventListener('unhandledrejection', (event) => {
   } catch {}
 })();
 
-if ('serviceWorker' in navigator) {
-  // Optional: reset SW via query param
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('reset-sw') === '1') {
-    // Service Workerとキャッシュを完全にクリアしてからリロード
-    Promise.all([
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        return Promise.all(regs.map(r => r.unregister()));
-      }),
-      caches ? caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))) : Promise.resolve()
-    ]).then(() => {
-      // 少し待ってからリロード（確実にクリアされるように）
-      setTimeout(() => {
-        const url = new URL(window.location.href);
-        url.search = '';
-        url.searchParams.set('_reload', Date.now().toString()); // キャッシュ回避
-        window.location.href = url.toString(); // replaceではなくhrefで確実にリロード
-      }, 500);
-    }).catch((err) => {
-      console.error('[SW Reset] エラー:', err);
-      // エラーが発生してもリロードを試みる
-      setTimeout(() => {
-        window.location.href = window.location.origin + window.location.pathname + '?_reload=' + Date.now();
-      }, 500);
-    });
-    // リセット処理中は何もレンダリングしない
-    return;
-  } else {
+// Service Workerリセット処理（リセット中はReactアプリをレンダリングしない）
+const params = new URLSearchParams(window.location.search);
+const isResetting = params.get('reset-sw') === '1';
+
+if (isResetting && 'serviceWorker' in navigator) {
+  // Service Workerとキャッシュを完全にクリアしてからリロード
+  Promise.all([
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      return Promise.all(regs.map(r => r.unregister()));
+    }),
+    caches ? caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))) : Promise.resolve()
+  ]).then(() => {
+    // 少し待ってからリロード（確実にクリアされるように）
+    setTimeout(() => {
+      const url = new URL(window.location.href);
+      url.search = '';
+      url.searchParams.set('_reload', Date.now().toString()); // キャッシュ回避
+      window.location.href = url.toString(); // replaceではなくhrefで確実にリロード
+    }, 500);
+  }).catch((err) => {
+    console.error('[SW Reset] エラー:', err);
+    // エラーが発生してもリロードを試みる
+    setTimeout(() => {
+      window.location.href = window.location.origin + window.location.pathname + '?_reload=' + Date.now();
+    }, 500);
+  });
+} else if (!isResetting && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
         // SWの更新を検知
@@ -109,13 +108,15 @@ if ('serviceWorker' in navigator) {
         });
       }, 60000); // 1分ごとにチェック
     });
-  }
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </StrictMode>,
-)
+// リセット処理中はReactアプリをレンダリングしない
+if (!isResetting) {
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </StrictMode>,
+  )
+}
