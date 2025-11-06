@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { storage, db } from '../config/firebase.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import './PhotoCapture.css';
@@ -14,6 +14,8 @@ export function PhotoCapture() {
   const [uploading, setUploading] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [editingPhotoId, setEditingPhotoId] = useState(null); // メイン写真を選び直し中のドキュメントID
+  const [tempSelectedIndex, setTempSelectedIndex] = useState(null); // 選択候補のインデックス
   
   // 自撮りモード用の状態
   const [isSelfieMode, setIsSelfieMode] = useState(false);
@@ -25,12 +27,59 @@ export function PhotoCapture() {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null); // 選択した写真のインデックス
   const playbackIntervalRef = useRef(null);
 
+  // 指定パターンのカメラdeviceIdを推定
+  const pickCameraByLabel = async (pattern) => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videos = devices.filter(d => d.kind === 'videoinput');
+      const preferred = videos.find(d => pattern.test(d.label || ''));
+      return preferred?.deviceId || videos[0]?.deviceId || null;
+    } catch {
+      return null;
+    }
+  };
+
   // カメラを開始
   const startCamera = async () => {
+    // 既存ストリームを停止してから開始
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      setStream(null);
+    }
+    const wantFront = !!isSelfieMode;
+    const tryConstraintsInOrder = async () => {
+      const trials = [];
+      if (wantFront) {
+        trials.push({ video: { facingMode: { exact: 'user' } } });
+        trials.push({ video: { facingMode: 'user' } });
+      } else {
+        trials.push({ video: { facingMode: { exact: 'environment' } } });
+        trials.push({ video: { facingMode: 'environment' } });
+      }
+
+      // デバイス列挙（ラベルが取れない環境ではnullの可能性あり）
+      const frontId = await pickCameraByLabel(/front|前面|内側|self|face/i);
+      const backId = await pickCameraByLabel(/back|rear|背面|外側|world/i);
+      if (wantFront && frontId) trials.push({ video: { deviceId: { exact: frontId } } });
+      if (!wantFront && backId) trials.push({ video: { deviceId: { exact: backId } } });
+
+      // 最後のフォールバック（どれでも）
+      trials.push({ video: true });
+
+      let lastError = null;
+      for (const c of trials) {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia(c);
+          return s;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      throw lastError || new Error('getUserMedia failed');
+    };
+
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // 背面カメラを優先
-      });
+      const mediaStream = await tryConstraintsInOrder();
       setStream(mediaStream);
       
       // video要素がレンダリングされるまで待つ（最大1秒）
@@ -374,6 +423,20 @@ export function PhotoCapture() {
     }
   };
 
+  // アップロード済みの写真からメイン写真を選び直す
+  const updateSelectedPhoto = async (photoId, index) => {
+    try {
+      await updateDoc(doc(db, 'eyedropPhotos', photoId), { selectedPhotoIndex: index });
+      setEditingPhotoId(null);
+      setTempSelectedIndex(null);
+      await loadUploadedPhotos();
+      alert('メイン写真を更新しました');
+    } catch (err) {
+      console.error('[PhotoCapture] メイン写真更新エラー:', err);
+      alert('更新に失敗しました');
+    }
+  };
+
   // アップロード済み写真を読み込み
   const loadUploadedPhotos = async () => {
     if (!user) return;
@@ -679,9 +742,47 @@ export function PhotoCapture() {
                        (photo.timestamp instanceof Date ? photo.timestamp.toLocaleString('ja-JP') : '日時不明')}
                     </p>
                     {photo.photoUrls && photo.photoUrls.length > 1 && (
-                      <p className="photo-count" style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                        {photo.photoUrls.length}枚
-                      </p>
+                      <div style={{ marginTop: '8px' }}>
+                        <button
+                          onClick={() => {
+                            setEditingPhotoId(photo.id);
+                            setTempSelectedIndex(photo.selectedPhotoIndex ?? 0);
+                          }}
+                          className="photo-btn-select"
+                          style={{
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            width: '100%'
+                          }}
+                        >
+                          別の写真を選ぶ（{photo.photoUrls.length}枚）
+                        </button>
+                        {editingPhotoId === photo.id && (
+                          <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: '8px' }}>
+                            {photo.photoUrls.map((thumb, idx) => (
+                              <div key={idx} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setTempSelectedIndex(idx)}>
+                                <img src={thumb} alt={`候補 ${idx + 1}`} style={{ width: '100%', height: '64px', objectFit: 'cover', borderRadius: '6px', border: (tempSelectedIndex ?? 0) === idx ? '3px solid #10b981' : '2px solid #e5e7eb' }} />
+                              </div>
+                            ))}
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', marginTop: '4px' }}>
+                              <button
+                                onClick={() => updateSelectedPhoto(photo.id, tempSelectedIndex ?? 0)}
+                                className="photo-btn-confirm"
+                                style={{ flex: 1 }}
+                              >
+                                この写真をメインにする
+                              </button>
+                              <button
+                                onClick={() => { setEditingPhotoId(null); setTempSelectedIndex(null); }}
+                                className="photo-btn-reject"
+                                style={{ flex: 1 }}
+                              >
+                                キャンセル
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
