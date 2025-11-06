@@ -41,7 +41,7 @@ export function PhotoCapture() {
     }
   };
 
-  // カメラの前面/背面を切り替え
+  // カメラの前面/背面を切り替え（撮影モードは変更しない）
   const switchCamera = async () => {
     // 既に処理中の場合は無視
     if (isSwitchingRef.current) {
@@ -52,11 +52,11 @@ export function PhotoCapture() {
     isSwitchingRef.current = true;
     try {
       const next = currentFacing === 'user' ? 'environment' : 'user';
-      const nextSelfieMode = next === 'user';
-      console.log('[PhotoCapture] カメラ切替開始:', currentFacing, '→', next);
+      console.log('[PhotoCapture] カメラ切替開始:', currentFacing, '→', next, '（現在のモード:', isSelfieMode ? '自撮り' : '通常', '）');
       
-      // 状態更新を待たずに、直接向きとモードを指定してカメラを起動
-      await startCameraWithFacing(next, nextSelfieMode);
+      // カメラの向きだけを変更し、撮影モード（isSelfieMode）は変更しない
+      // nullを渡すことで、isSelfieModeの現在の値を維持
+      await startCameraWithFacing(next, null);
     } finally {
       // 処理完了後にフラグをリセット（少し遅延させて確実に）
       setTimeout(() => {
@@ -240,6 +240,7 @@ export function PhotoCapture() {
 
   // 写真を撮影（1枚）
   const capturePhoto = () => {
+    console.log('[PhotoCapture] capturePhoto呼び出し（通常撮影）', { isSelfieMode, currentFacing });
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -591,6 +592,7 @@ export function PhotoCapture() {
         <div className="photo-mode-selector">
           <button
             onClick={async () => {
+              console.log('[PhotoCapture] 自撮りモードボタンクリック');
               // 自撮りモード（前面カメラ）で起動、状態も同時に更新
               await startCameraWithFacing('user', true);
             }}
@@ -600,6 +602,7 @@ export function PhotoCapture() {
           </button>
           <button
             onClick={async () => {
+              console.log('[PhotoCapture] 通常モードボタンクリック');
               // 通常モード（背面カメラ）で起動、状態も同時に更新
               await startCameraWithFacing('environment', false);
             }}
@@ -758,15 +761,15 @@ export function PhotoCapture() {
           </div>
           
           <div className="photo-controls">
-            {/* 自撮りモード：カウントダウン撮影ボタン（前面カメラかつ自撮りモードの場合のみ） */}
-            {isSelfieMode && currentFacing === 'user' && capturedPhotos.length === 0 && countdown === null && !isCapturing && (
+            {/* 自撮りモード：カウントダウン撮影ボタン（自撮りモードの場合のみ） */}
+            {isSelfieMode && capturedPhotos.length === 0 && countdown === null && !isCapturing && (
               <button onClick={startSelfieCapture} className="photo-btn-capture-selfie" disabled={isCapturing}>
                 📸 撮影
               </button>
             )}
             
-            {/* 通常モード：1枚撮影ボタン（背面カメラまたは通常モードの場合） */}
-            {(!isSelfieMode || currentFacing === 'environment') && !photoUrl && capturedPhotos.length === 0 && (
+            {/* 通常モード：1枚撮影ボタン（通常モードの場合） */}
+            {!isSelfieMode && !photoUrl && capturedPhotos.length === 0 && (
               <button onClick={capturePhoto} className="photo-btn-capture">
                 📸 撮影
               </button>
