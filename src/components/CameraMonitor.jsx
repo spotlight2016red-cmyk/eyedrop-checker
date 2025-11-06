@@ -160,6 +160,21 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
         setCameraStatus(prev => ({ ...prev, hasSrcObject: true }));
         setStream(mediaStream);
         
+        // 再生を試みる関数（統一）
+        const attemptPlay = async () => {
+          if (!videoRef.current) return false;
+          
+          try {
+            await videoRef.current.play();
+            console.log('[CameraMonitor] 動画再生開始成功');
+            setCameraStatus(prev => ({ ...prev, paused: false }));
+            return true;
+          } catch (playError) {
+            console.error('[CameraMonitor] 動画再生エラー:', playError);
+            return false;
+          }
+        };
+        
         // video要素のイベントを監視
         videoRef.current.onloadedmetadata = () => {
           console.log('[CameraMonitor] メタデータ読み込み完了');
@@ -176,12 +191,7 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           // メタデータ読み込み後、再生を開始
           if (videoRef.current && videoRef.current.paused) {
             console.log('[CameraMonitor] メタデータ読み込み後、再生を開始');
-            videoRef.current.play().then(() => {
-              console.log('[CameraMonitor] 再生成功');
-              setCameraStatus(prev => ({ ...prev, paused: false }));
-            }).catch(err => {
-              console.error('[CameraMonitor] メタデータ読み込み後の再生エラー:', err);
-            });
+            attemptPlay();
           }
         };
         
@@ -193,14 +203,10 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             paused: videoRef.current?.paused ?? true,
             hasSrcObject: !!videoRef.current?.srcObject
           }));
-          // 再生を再試行
+          // 再生を再試行（まだ停止している場合）
           if (videoRef.current && videoRef.current.paused) {
-            videoRef.current.play().then(() => {
-              console.log('[CameraMonitor] oncanplay後の再生成功');
-              setCameraStatus(prev => ({ ...prev, paused: false }));
-            }).catch(err => {
-              console.error('[CameraMonitor] oncanplay後の再生エラー:', err);
-            });
+            console.log('[CameraMonitor] oncanplay後の再生を試行');
+            attemptPlay();
           }
         };
         
@@ -240,39 +246,14 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             
             // 再生状態を確認して、停止している場合は再開
             if (videoRef.current.paused && videoRef.current.readyState >= 2) {
-              console.log('[CameraMonitor] 動画が停止しているため再開');
-              videoRef.current.play().catch(err => {
-                console.error('[CameraMonitor] 自動再生エラー:', err);
-              });
+              console.log('[CameraMonitor] 動画が停止しているため再開を試行');
+              attemptPlay();
             }
           }
         }, 1000);
         
         // クリーンアップ関数を保存
         videoRef.current._statusInterval = statusInterval;
-        
-        // 再生を開始（複数回試行）
-        const tryPlay = async () => {
-          if (!videoRef.current) return;
-          
-          try {
-            await videoRef.current.play();
-            console.log('[CameraMonitor] 動画再生開始成功');
-            setCameraStatus(prev => ({ ...prev, paused: false }));
-          } catch (playError) {
-            console.error('[CameraMonitor] 動画再生エラー:', playError);
-            // 再生に失敗した場合、少し待ってから再試行
-            setTimeout(() => {
-              if (videoRef.current && videoRef.current.paused) {
-                console.log('[CameraMonitor] 再生再試行');
-                tryPlay();
-              }
-            }, 1000);
-          }
-        };
-        
-        // すぐに再生を試行
-        tryPlay();
       } catch (err) {
         console.error('[CameraMonitor] カメラアクセスエラー:', err);
         alert('カメラへのアクセスが許可されていません。ブラウザの設定からカメラへのアクセスを許可してください。');
