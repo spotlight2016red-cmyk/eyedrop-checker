@@ -16,6 +16,7 @@ export function PhotoCapture() {
   const [loading, setLoading] = useState(false);
   const [editingPhotoId, setEditingPhotoId] = useState(null); // メイン写真を選び直し中のドキュメントID
   const [tempSelectedIndex, setTempSelectedIndex] = useState(null); // 選択候補のインデックス
+  const [currentFacing, setCurrentFacing] = useState('environment'); // 'user' | 'environment'
   
   // 自撮りモード用の状態
   const [isSelfieMode, setIsSelfieMode] = useState(false);
@@ -39,6 +40,17 @@ export function PhotoCapture() {
     }
   };
 
+  // カメラの前面/背面を切り替え
+  const switchCamera = async () => {
+    const next = currentFacing === 'user' ? 'environment' : 'user';
+    // isSelfieModeを同期して維持（user=自撮りモード）
+    setIsSelfieMode(next === 'user');
+    // state更新の反映後に再起動
+    setTimeout(() => {
+      startCamera();
+    }, 10);
+  };
+
   // カメラを開始
   const startCamera = async () => {
     // 既存ストリームを停止してから開始
@@ -47,6 +59,7 @@ export function PhotoCapture() {
       setStream(null);
     }
     const wantFront = !!isSelfieMode;
+    setCurrentFacing(wantFront ? 'user' : 'environment');
     const tryConstraintsInOrder = async () => {
       const trials = [];
       if (wantFront) {
@@ -136,7 +149,13 @@ export function PhotoCapture() {
       };
       
       videoRef.current.onplay = () => {
-        console.log('[PhotoCapture] 動画再生開始');
+        try {
+          const track = mediaStream.getVideoTracks?.()[0];
+          const settings = track?.getSettings?.() || {};
+          console.log('[PhotoCapture] 動画再生開始', settings);
+        } catch {
+          console.log('[PhotoCapture] 動画再生開始');
+        }
       };
       
       videoRef.current.onerror = (e) => {
@@ -699,6 +718,9 @@ export function PhotoCapture() {
               </button>
             )}
             
+            <button onClick={switchCamera} className="photo-btn-stop" style={{ borderColor: '#3b82f6', color: '#3b82f6' }}>
+              カメラ切替
+            </button>
             <button onClick={stopCamera} className="photo-btn-stop">
               カメラを停止
             </button>
