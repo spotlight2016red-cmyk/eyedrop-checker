@@ -7,6 +7,24 @@ export async function requestPermission() {
 export async function showNotification(title, options = {}) {
   console.log('[NotifHelper] Showing notification:', title, options);
   
+  // 通知許可が`default`の場合は先に許可を要求
+  if ('Notification' in window && Notification.permission === 'default') {
+    console.log('[NotifHelper] 通知許可が`default`のため、許可を要求します');
+    try {
+      const permission = await requestPermission();
+      if (permission !== 'granted') {
+        console.warn('[NotifHelper] 通知許可が拒否されました。許可状態:', permission);
+        alert(`通知が送れません。許可状態: ${permission}\n\nブラウザの設定から通知を許可してください。`);
+        return null;
+      }
+      console.log('[NotifHelper] 通知許可が取得されました。通知を送信します');
+    } catch (err) {
+      console.error('[NotifHelper] 通知許可要求エラー:', err);
+      alert(`通知が送れません。許可状態: default\n\nブラウザの設定から通知を許可してください。`);
+      return null;
+    }
+  }
+  
   // PCかスマホかを判定
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
@@ -143,24 +161,8 @@ export async function showNotification(title, options = {}) {
       }
       
       return result;
-    } else if (Notification.permission === 'default') {
-      // 通知許可が`default`の場合は自動的に許可を要求
-      console.log('[NotifHelper] 通知許可が`default`のため、許可を要求します');
-      try {
-        const permission = await requestPermission();
-        if (permission === 'granted') {
-          console.log('[NotifHelper] 通知許可が取得されました。通知を再送信します');
-          // 許可が取得されたら、再度通知を送信
-          return await showNotification(title, options);
-        } else {
-          console.warn('[NotifHelper] 通知許可が拒否されました。許可状態:', permission);
-          alert(`通知が送れません。許可状態: ${permission}\n\nブラウザの設定から通知を許可してください。`);
-        }
-      } catch (err) {
-        console.error('[NotifHelper] 通知許可要求エラー:', err);
-        alert(`通知が送れません。許可状態: default\n\nブラウザの設定から通知を許可してください。`);
-      }
     } else {
+      // 許可が拒否されている場合
       console.warn('[NotifHelper] 通知が送れません。許可状態:', Notification.permission);
       alert(`通知が送れません。許可状態: ${Notification.permission}\n\nブラウザの設定から通知を許可してください。`);
     }
