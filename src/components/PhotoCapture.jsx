@@ -31,13 +31,60 @@ export function PhotoCapture() {
         video: { facingMode: 'environment' } // 背面カメラを優先
       });
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
+      
+      if (!videoRef.current) {
+        console.error('[PhotoCapture] video要素が見つかりません');
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
       }
+      
+      // 再生を試みる関数（統一）
+      const attemptPlay = async () => {
+        if (!videoRef.current) return false;
+        
+        try {
+          await videoRef.current.play();
+          console.log('[PhotoCapture] 動画再生開始成功');
+          return true;
+        } catch (playError) {
+          console.error('[PhotoCapture] 動画再生エラー:', playError);
+          return false;
+        }
+      };
+      
+      videoRef.current.srcObject = mediaStream;
+      
+      // video要素のイベントを監視
+      videoRef.current.onloadedmetadata = () => {
+        console.log('[PhotoCapture] メタデータ読み込み完了');
+        // メタデータ読み込み後、再生を開始
+        if (videoRef.current && videoRef.current.paused) {
+          console.log('[PhotoCapture] メタデータ読み込み後、再生を開始');
+          attemptPlay();
+        }
+      };
+      
+      videoRef.current.oncanplay = () => {
+        console.log('[PhotoCapture] 動画再生可能');
+        // 再生を再試行（まだ停止している場合）
+        if (videoRef.current && videoRef.current.paused) {
+          console.log('[PhotoCapture] oncanplay後の再生を試行');
+          attemptPlay();
+        }
+      };
+      
+      videoRef.current.onplay = () => {
+        console.log('[PhotoCapture] 動画再生開始');
+      };
+      
+      videoRef.current.onerror = (e) => {
+        console.error('[PhotoCapture] video要素エラー:', e);
+        alert(`動画の再生に失敗しました: ${videoRef.current?.error?.message || 'エラーが発生しました'}`);
+      };
+      
     } catch (err) {
-      console.error('カメラアクセスエラー:', err);
-      alert('カメラへのアクセスが許可されていません。');
+      console.error('[PhotoCapture] カメラアクセスエラー:', err);
+      alert('カメラへのアクセスが許可されていません。ブラウザの設定からカメラへのアクセスを許可してください。');
     }
   };
 
@@ -450,6 +497,18 @@ export function PhotoCapture() {
                 playsInline
                 muted
                 className="photo-video"
+                onClick={async () => {
+                  // 動画要素をクリックしたときに再生を開始（PWAモードで自動再生が制限される場合に対応）
+                  if (videoRef.current && videoRef.current.paused) {
+                    try {
+                      await videoRef.current.play();
+                      console.log('[PhotoCapture] クリック時の再生成功');
+                    } catch (err) {
+                      console.error('[PhotoCapture] クリック時の再生エラー:', err);
+                    }
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
               />
             )}
             <canvas ref={canvasRef} style={{ display: 'none' }} />
