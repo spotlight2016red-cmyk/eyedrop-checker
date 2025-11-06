@@ -370,6 +370,15 @@
   overflow-x: hidden;
 }
 
+/* 画像ボックス（矢印をこの中に重ねる） */
+.photo-image-box {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* 前/次ボタン */
 .photo-btn-nav {
   position: absolute;

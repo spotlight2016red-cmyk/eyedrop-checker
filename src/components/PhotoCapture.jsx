@@ -484,27 +484,28 @@ export function PhotoCapture() {
             {/* 再生画面 */}
             {capturedPhotos.length > 0 && !isCapturing && (
               <div className="photo-playback">
-                {/* 前/次ボタン（画像の左右） */}
-                <button
-                  onClick={goToPreviousPhoto}
-                  className="photo-btn-nav photo-btn-nav-prev"
-                  aria-label="前の写真"
-                >
-                  ◀
-                </button>
-                <button
-                  onClick={goToNextPhoto}
-                  className="photo-btn-nav photo-btn-nav-next"
-                  aria-label="次の写真"
-                >
-                  ▶
-                </button>
-                
-                <img 
-                  src={capturedPhotos[currentPhotoIndex]} 
-                  alt={`撮影した写真 ${currentPhotoIndex + 1}/${capturedPhotos.length}`}
-                  className="photo-playback-image"
-                />
+                {/* 画像ボックス（矢印を画像の上に重ねる） */}
+                <div className="photo-image-box">
+                  <button
+                    onClick={goToPreviousPhoto}
+                    className="photo-btn-nav photo-btn-nav-prev"
+                    aria-label="前の写真"
+                  >
+                    ◀
+                  </button>
+                  <img 
+                    src={capturedPhotos[currentPhotoIndex]} 
+                    alt={`撮影した写真 ${currentPhotoIndex + 1}/${capturedPhotos.length}`}
+                    className="photo-playback-image"
+                  />
+                  <button
+                    onClick={goToNextPhoto}
+                    className="photo-btn-nav photo-btn-nav-next"
+                    aria-label="次の写真"
+                  >
+                    ▶
+                  </button>
+                </div>
                 <div className="photo-playback-info">
                   {currentPhotoIndex + 1} / {capturedPhotos.length}
                 </div>
