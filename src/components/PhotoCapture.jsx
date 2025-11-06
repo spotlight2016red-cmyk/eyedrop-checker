@@ -605,6 +605,29 @@ export function PhotoCapture() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // アップロード後にビデオ要素を再設定（真っ黒画面を防ぐ）
+  useEffect(() => {
+    // 撮影が完了し、カメラビューが表示されるべき状態のとき
+    if (stream && capturedPhotos.length === 0 && !photoUrl && videoRef.current) {
+      const video = videoRef.current;
+      // srcObjectが設定されていない、または異なる場合は再設定
+      if (!video.srcObject || video.srcObject !== stream) {
+        console.log('[PhotoCapture] ビデオ要素にストリームを再設定');
+        video.srcObject = stream;
+        // 再生を試みる
+        video.play().catch(err => {
+          console.warn('[PhotoCapture] ビデオ再生エラー（再設定後）:', err);
+        });
+      } else if (video.paused) {
+        // srcObjectは設定されているが、再生されていない場合は再生
+        console.log('[PhotoCapture] ビデオを再生（一時停止中）');
+        video.play().catch(err => {
+          console.warn('[PhotoCapture] ビデオ再生エラー:', err);
+        });
+      }
+    }
+  }, [stream, capturedPhotos.length, photoUrl]);
+
   // クリーンアップ
   useEffect(() => {
     return () => {
