@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 家族メンバーコレクション
+    match /familyMembers/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // 通知コレクション
+    match /notifications/{document=**} {
+      allow read: if request.auth != null && request.auth.token.email == resource.data.email;
+      allow write: if request.auth != null;
+    }
+    
+    // 目薬写真コレクション
+    match /eyedropPhotos/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}
