@@ -423,14 +423,31 @@ export function PhotoCapture() {
       setIsPlaying(false);
       loadUploadedPhotos();
       
-      // カメラストリームが継続しているか確認
-      if (videoRef.current && !videoRef.current.srcObject) {
-        console.log('[PhotoCapture] カメラストリームが停止されているため、再起動します');
-        // カメラを再起動（現在のモードを維持）
-        setTimeout(() => {
-          startCameraWithFacing(currentFacing, isSelfieMode);
-        }, 100);
-      }
+      // カメラストリームをビデオ要素に再設定
+      setTimeout(() => {
+        const video = videoRef.current;
+        if (video) {
+          const currentStream = video.srcObject;
+          if (currentStream && currentStream.active) {
+            console.log('[PhotoCapture] カメラストリームはアクティブ、再生を強制');
+            // ストリームは存在するが、再生されていない可能性があるので再生を強制
+            video.play().catch(err => {
+              console.warn('[PhotoCapture] ビデオ再生エラー:', err);
+            });
+          } else if (stream && stream.active) {
+            console.log('[PhotoCapture] カメラストリームをビデオ要素に再設定');
+            video.srcObject = stream;
+            // 再生を強制
+            video.play().catch(err => {
+              console.warn('[PhotoCapture] ビデオ再生エラー:', err);
+            });
+          } else {
+            console.log('[PhotoCapture] カメラストリームが停止されているため、再起動します');
+            // カメラを再起動（現在のモードを維持）
+            startCameraWithFacing(currentFacing, isSelfieMode);
+          }
+        }
+      }, 100);
     } catch (err) {
       console.error('[PhotoCapture] アップロードエラー:', err);
       console.error('[PhotoCapture] エラー詳細:', err.code, err.message);
