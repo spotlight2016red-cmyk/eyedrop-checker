@@ -60,12 +60,31 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   }, [isActive, noMotionStartTime, testMode]); // testModeが変わるとNO_MOTION_THRESHOLDも変わるため追加
 
   useEffect(() => {
-    if (isActive && videoRef.current) {
+    console.log('[CameraMonitor] isActive変更:', isActive, 'videoRef:', !!videoRef.current);
+    if (isActive) {
+      // videoRef.currentが設定されるまで少し待つ
+      if (!videoRef.current) {
+        console.log('[CameraMonitor] videoRefがまだ設定されていません。少し待ってから再試行します');
+        const timer = setTimeout(() => {
+          if (isActive && videoRef.current) {
+            console.log('[CameraMonitor] 監視開始（遅延）');
+            startMonitoring();
+          } else {
+            console.error('[CameraMonitor] videoRefが設定されませんでした');
+            setIsActive(false);
+            alert('カメラの初期化に失敗しました。ページをリロードして再度お試しください。');
+          }
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+      console.log('[CameraMonitor] 監視開始');
       startMonitoring();
     } else {
+      console.log('[CameraMonitor] 監視停止');
       stopMonitoring();
     }
     return () => {
+      console.log('[CameraMonitor] クリーンアップ');
       stopMonitoring();
     };
   }, [isActive, testMode]);

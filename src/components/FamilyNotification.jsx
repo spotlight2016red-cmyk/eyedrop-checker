@@ -242,9 +242,14 @@ export async function notifyFamily(userId, message, userEmail = null) {
       
       const existingSnapshot = await getDocs(existingQuery);
       
-      // 既に通知が存在する場合はスキップ
-      if (existingSnapshot.size > 0) {
-        console.log(`[notifyFamily] ${email}への通知は既に存在するためスキップ`);
+      // 既に通知が存在する場合はスキップ（メッセージの内容も確認）
+      const hasDuplicate = existingSnapshot.docs.some(doc => {
+        const data = doc.data();
+        return data.message === message; // 同じメッセージが既に存在するかチェック
+      });
+      
+      if (hasDuplicate) {
+        console.log(`[notifyFamily] ${email}への通知は既に存在するためスキップ（メッセージ: ${message}）`);
         continue;
       }
       

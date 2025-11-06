@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import './App.css'
 import { startScheduler, requestPermission, showNotification } from './utils/notificationHelper.js'
 import { AvatarMascot } from './components/AvatarMascot.jsx'
@@ -49,6 +49,7 @@ function AppContent() {
   const [banner, setBanner] = useState(null); // { text, slot }
   const [highlightSlot, setHighlightSlot] = useState(null); // 'morning' | 'noon' | 'night' | null
   const [updateAvailable, setUpdateAvailable] = useState(false); // SW更新が利用可能か
+  const processedNotificationsRef = useRef(new Set()); // 処理済み通知IDを追跡
 
   const key = useMemo(() => todayKey(), []);
   const day = data[key] ?? { morning: false, noon: false, night: false, note: '' };
@@ -106,7 +107,18 @@ function AppContent() {
       console.log('[App] 通知スナップショット更新:', snapshot.size, '件');
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
+          const notifId = change.doc.id;
           const notif = change.doc.data();
+          
+          // 既に処理済みの通知はスキップ
+          if (processedNotificationsRef.current.has(notifId)) {
+            console.log('[App] 既に処理済みの通知をスキップ:', notifId);
+            return;
+          }
+          
+          // 処理済みフラグを設定
+          processedNotificationsRef.current.add(notifId);
+          
           console.log('[App] 新しい通知を受信:', notif);
           
           // 通知を送信（カメラ監視からの通知か、家族からの通知かを判定）
