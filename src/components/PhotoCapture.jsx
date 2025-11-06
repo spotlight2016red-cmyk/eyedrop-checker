@@ -497,12 +497,6 @@ export function PhotoCapture() {
                       background: selectedPhotoIndex === currentPhotoIndex 
                         ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
                         : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
                       cursor: uploading ? 'not-allowed' : 'pointer',
                       opacity: uploading ? 0.5 : 1
                     }}
