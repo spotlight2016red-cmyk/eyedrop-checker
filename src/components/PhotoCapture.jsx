@@ -22,6 +22,7 @@ export function PhotoCapture() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null); // 選択した写真のインデックス
   const playbackIntervalRef = useRef(null);
 
   // カメラを開始
@@ -137,6 +138,7 @@ export function PhotoCapture() {
     setIsCapturing(true);
     setCapturedPhotos([]);
     setCurrentPhotoIndex(0);
+    setSelectedPhotoIndex(null); // 選択をリセット
     
     // カウントダウン（3, 2, 1）
     let count = 3;
@@ -252,6 +254,7 @@ export function PhotoCapture() {
         email: user.email,
         photoUrls: photoUrls, // 複数の写真URL
         photoCount: photoUrls.length,
+        selectedPhotoIndex: selectedPhotoIndex !== null ? selectedPhotoIndex : 0, // 選択した写真のインデックス（未選択の場合は0）
         timestamp: new Date(),
         type: 'correct-action', // 正しい動作の写真
         mode: 'selfie' // 自撮りモード
@@ -282,7 +285,14 @@ export function PhotoCapture() {
   const rejectAndRetry = () => {
     setCapturedPhotos([]);
     setCurrentPhotoIndex(0);
+    setSelectedPhotoIndex(null);
     stopPlayback();
+  };
+  
+  // この写真を選択
+  const selectCurrentPhoto = () => {
+    setSelectedPhotoIndex(currentPhotoIndex);
+    alert(`写真 ${currentPhotoIndex + 1} を選択しました。\nアップロード時にこの写真がメイン表示として使用されます。`);
   };
 
   // 写真をアップロード
@@ -480,6 +490,26 @@ export function PhotoCapture() {
                 </div>
                 <div className="photo-confirm-actions">
                   <button
+                    onClick={selectCurrentPhoto}
+                    className="photo-btn-select"
+                    disabled={uploading}
+                    style={{
+                      background: selectedPhotoIndex === currentPhotoIndex 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                        : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      cursor: uploading ? 'not-allowed' : 'pointer',
+                      opacity: uploading ? 0.5 : 1
+                    }}
+                  >
+                    {selectedPhotoIndex === currentPhotoIndex ? '✓ 選択済み' : '📌 この写真を選択'}
+                  </button>
+                  <button
                     onClick={rejectAndRetry}
                     className="photo-btn-reject"
                     disabled={uploading}
@@ -576,8 +606,10 @@ export function PhotoCapture() {
             <div className="photo-grid">
               {uploadedPhotos.map((photo) => {
                 // 自撮りモード（複数写真）と通常モード（1枚）の両方に対応
+                // 選択した写真がある場合はそれを表示、なければ最初の写真を表示
+                const selectedIndex = photo.selectedPhotoIndex !== undefined ? photo.selectedPhotoIndex : 0;
                 const imageUrl = photo.photoUrls && photo.photoUrls.length > 0 
-                  ? photo.photoUrls[0] // 自撮りモード：最初の写真を表示
+                  ? photo.photoUrls[selectedIndex] // 自撮りモード：選択した写真（または最初の写真）を表示
                   : photo.photoUrl; // 通常モード：1枚の写真
                 
                 console.log('[PhotoCapture] 写真データ:', {
