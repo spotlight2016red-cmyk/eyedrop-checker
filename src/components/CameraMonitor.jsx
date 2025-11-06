@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase.js';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { storage, db } from '../config/firebase.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import './CameraMonitor.css';
 
@@ -17,11 +18,14 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
   const [remainingTime, setRemainingTime] = useState(null);
   const [cameraStatus, setCameraStatus] = useState({ width: 0, height: 0, readyState: 0, error: null, paused: true, hasSrcObject: false });
   const [patternDetected, setPatternDetected] = useState(false); // パターン検出の表示用
+  const [uploadedPhotos, setUploadedPhotos] = useState([]); // アップロード済み写真（学習用）
+  const [goodFeedback, setGoodFeedback] = useState(false); // Goodフィードバック表示用
   const lastFrameRef = useRef(null);
   const intervalRef = useRef(null);
   const motionHistoryRef = useRef([]); // 動きの履歴（最近の動きを記録）
   const noMotionStartTimeRef = useRef(null); // noMotionStartTimeの最新値を保持
   const noMotionNotifiedRef = useRef(false); // 通知を送ったかどうかのフラグ
+  const goodFeedbackTimeoutRef = useRef(null); // Goodフィードバックのタイムアウト
 
   const NO_MOTION_THRESHOLD = testMode ? 30 * 1000 : 5 * 60 * 1000; // テストモード: 30秒、通常: 5分（ミリ秒）
   
@@ -378,6 +382,28 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     };
   };
 
+  // アップロード済み写真を読み込み（学習用パターン）
+  const loadUploadedPhotos = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = query(
+        collection(db, 'eyedropPhotos'),
+        where('userId', '==', user.uid),
+        orderBy('timestamp', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const photos = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUploadedPhotos(photos);
+      console.log('[CameraMonitor] アップロード済み写真を読み込み:', photos.length, '件');
+    } catch (err) {
+      console.warn('[CameraMonitor] 写真読み込みエラー（続行）:', err);
+      setUploadedPhotos([]);
+    }
+  }, [user]);
+
   // 連続した動きパターンを検出（目薬を取ってさす動作）
   const checkMotionPattern = () => {
     const now = Date.now();
@@ -428,6 +454,14 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, stream]);
 
+  // アップロード済み写真を読み込み（学習用パターン）
+  useEffect(() => {
+    if (user) {
+      loadUploadedPhotos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const startMotionDetection = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -462,6 +496,19 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
           time: Date.now(),
           intensity: intensity
         });
+        
+        // アップロード済み写真がある場合、「Good」フィードバックを表示
+        if (uploadedPhotos.length > 0 && intensity > 10) {
+          setGoodFeedback(true);
+          // 既存のタイムアウトをクリア
+          if (goodFeedbackTimeoutRef.current) {
+            clearTimeout(goodFeedbackTimeoutRef.current);
+          }
+          // 2秒後に非表示
+          goodFeedbackTimeoutRef.current = setTimeout(() => {
+            setGoodFeedback(false);
+          }, 2000);
+        }
         
         // 連続した動きパターンを検出（目薬を取ってさす動作）
         const isEyedropPattern = checkMotionPattern();
@@ -579,7 +626,19 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
 
     // 1秒ごとに動き検出を実行（バックグラウンドでもタイマーは継続）
     intervalRef.current = setInterval(detectMotion, 1000);
-  }, [testMode, noMotionTimer, onMotionDetected, onNoMotion]);
+    
+    return () => {
+      // クリーンアップ: インターバルとタイムアウトをクリア
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (goodFeedbackTimeoutRef.current) {
+        clearTimeout(goodFeedbackTimeoutRef.current);
+        goodFeedbackTimeoutRef.current = null;
+      }
+    };
+  }, [testMode, noMotionTimer, onMotionDetected, onNoMotion, uploadedPhotos]);
 
   const startMonitoring = useCallback(async () => {
     try {
@@ -933,6 +992,40 @@ export function CameraMonitor({ onMotionDetected, onNoMotion }) {
             </div>
           )}
           <canvas ref={canvasRef} className="camera-canvas" style={{ display: 'none' }} />
+          {/* Goodフィードバック（緑の枠） */}
+          {goodFeedback && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              border: '6px solid #22c55e',
+              borderRadius: '12px',
+              pointerEvents: 'none',
+              zIndex: 20,
+              boxShadow: '0 0 30px rgba(34, 197, 94, 0.8)',
+              animation: 'goodPulse 0.5s ease-out'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                background: 'rgba(34, 197, 94, 0.95)',
+                color: '#fff',
+                fontSize: '48px',
+                fontWeight: 'bold',
+                padding: '20px 40px',
+                borderRadius: '16px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                textAlign: 'center',
+                zIndex: 21
+              }}>
+                ✅ Good!
+              </div>
+            </div>
+          )}
           <div className="camera-status">
             <div>動き検出回数: {motionCount}</div>
             {remainingTime !== null && remainingTime > 0 && (
