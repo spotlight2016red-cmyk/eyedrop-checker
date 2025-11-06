@@ -414,9 +414,23 @@ export function PhotoCapture() {
       });
 
       alert('写真をアップロードしました！\n正しい動作として保存されました。');
+      // 状態をリセットしてカメラビューに戻る
       setCapturedPhotos([]);
       setCurrentPhotoIndex(0);
+      setSelectedPhotoIndex(null);
+      setCountdown(null);
+      setIsCapturing(false);
+      setIsPlaying(false);
       loadUploadedPhotos();
+      
+      // カメラストリームが継続しているか確認
+      if (videoRef.current && !videoRef.current.srcObject) {
+        console.log('[PhotoCapture] カメラストリームが停止されているため、再起動します');
+        // カメラを再起動（現在のモードを維持）
+        setTimeout(() => {
+          startCameraWithFacing(currentFacing, isSelfieMode);
+        }, 100);
+      }
     } catch (err) {
       console.error('[PhotoCapture] アップロードエラー:', err);
       console.error('[PhotoCapture] エラー詳細:', err.code, err.message);
@@ -482,8 +496,16 @@ export function PhotoCapture() {
           });
 
           alert('写真をアップロードしました！\n正しい動作として保存されました。');
+          // 状態をリセットしてカメラビューに戻る
           setPhotoUrl(null);
           loadUploadedPhotos();
+          
+          // カメラストリームが継続しているか確認
+          if (!stream && videoRef.current) {
+            console.log('[PhotoCapture] カメラストリームが停止されているため、再起動します');
+            // カメラを再起動（現在のモードを維持）
+            startCameraWithFacing(currentFacing, isSelfieMode);
+          }
         } catch (err) {
           console.error('[PhotoCapture] アップロードエラー:', err);
           console.error('[PhotoCapture] エラー詳細:', err.code, err.message);
