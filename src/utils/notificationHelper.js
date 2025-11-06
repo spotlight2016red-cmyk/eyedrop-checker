@@ -14,7 +14,30 @@ export async function showNotification(title, options = {}) {
       const permission = await requestPermission();
       if (permission !== 'granted') {
         console.warn('[NotifHelper] 通知許可が拒否されました。許可状態:', permission);
-        alert(`通知が送れません。許可状態: ${permission}\n\nブラウザの設定から通知を許可してください。`);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isPWAStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                                 (window.navigator.standalone === true);
+        
+        let message = `通知が送れません。許可状態: ${permission}\n\n`;
+        
+        if (isIOS && isPWAStandalone) {
+          message += 'iOSの設定アプリから通知を許可してください:\n';
+          message += '1. 設定アプリを開く\n';
+          message += '2. 「画面表示と明るさ」または「通知」を開く\n';
+          message += '3. 「目薬チェック」アプリを探す\n';
+          message += '4. 通知を「許可」に設定';
+        } else if (isIOS) {
+          message += 'Safariの設定から通知を許可してください:\n';
+          message += '1. 設定アプリを開く\n';
+          message += '2. Safari → 通知\n';
+          message += '3. 「目薬チェック」を見つけて通知を許可';
+        } else {
+          message += 'ブラウザの設定から通知を許可してください:\n';
+          message += 'Chrome: chrome://settings/content/notifications\n';
+          message += 'Safari: 設定 → Safari → 通知';
+        }
+        
+        alert(message);
         return null;
       }
       console.log('[NotifHelper] 通知許可が取得されました。通知を送信します');
@@ -164,7 +187,33 @@ export async function showNotification(title, options = {}) {
     } else {
       // 許可が拒否されている場合
       console.warn('[NotifHelper] 通知が送れません。許可状態:', Notification.permission);
-      alert(`通知が送れません。許可状態: ${Notification.permission}\n\nブラウザの設定から通知を許可してください。`);
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isPWAStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                               (window.navigator.standalone === true);
+      
+      let message = `通知が送れません。許可状態: ${Notification.permission}\n\n`;
+      
+      if (isIOS && isPWAStandalone) {
+        message += 'iOSの設定アプリから通知を許可してください:\n';
+        message += '1. 設定アプリを開く\n';
+        message += '2. 「画面表示と明るさ」または「通知」を開く\n';
+        message += '3. 「目薬チェック」アプリを探す\n';
+        message += '4. 通知を「許可」に設定\n';
+        message += '\nまたは、Safariの設定から通知を許可してください:\n';
+        message += '1. 設定アプリ → Safari → 通知\n';
+        message += '2. 「目薬チェック」を見つけて通知を許可';
+      } else if (isIOS) {
+        message += 'Safariの設定から通知を許可してください:\n';
+        message += '1. 設定アプリを開く\n';
+        message += '2. Safari → 通知\n';
+        message += '3. 「目薬チェック」を見つけて通知を許可';
+      } else {
+        message += 'ブラウザの設定から通知を許可してください:\n';
+        message += 'Chrome: chrome://settings/content/notifications\n';
+        message += 'Safari: 設定 → Safari → 通知';
+      }
+      
+      alert(message);
     }
   } catch (e) {
     console.error('[NotifHelper] Error showing notification:', e);
