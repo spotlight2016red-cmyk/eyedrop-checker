@@ -262,8 +262,17 @@ export function PhotoCapture() {
       setCurrentPhotoIndex(0);
       loadUploadedPhotos();
     } catch (err) {
-      console.error('アップロードエラー:', err);
-      alert(`アップロードに失敗しました: ${err.message}`);
+      console.error('[PhotoCapture] アップロードエラー:', err);
+      console.error('[PhotoCapture] エラー詳細:', err.code, err.message);
+      
+      let errorMessage = `アップロードに失敗しました: ${err.message || err.code || '不明なエラー'}`;
+      
+      // CORSエラーの場合、より詳細なメッセージを表示
+      if (err.code === 'storage/unauthorized' || err.message?.includes('CORS') || err.message?.includes('permission')) {
+        errorMessage = 'アップロードに失敗しました。\n\nFirebase Storageのセキュリティルールが設定されていない可能性があります。\n\nFirebase ConsoleでStorageのセキュリティルールを設定してください。';
+      }
+      
+      alert(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -313,8 +322,17 @@ export function PhotoCapture() {
           setPhotoUrl(null);
           loadUploadedPhotos();
         } catch (err) {
-          console.error('アップロードエラー:', err);
-          alert(`アップロードに失敗しました: ${err.message}`);
+          console.error('[PhotoCapture] アップロードエラー:', err);
+          console.error('[PhotoCapture] エラー詳細:', err.code, err.message);
+          
+          let errorMessage = `アップロードに失敗しました: ${err.message || err.code || '不明なエラー'}`;
+          
+          // CORSエラーの場合、より詳細なメッセージを表示
+          if (err.code === 'storage/unauthorized' || err.message?.includes('CORS') || err.message?.includes('permission')) {
+            errorMessage = 'アップロードに失敗しました。\n\nFirebase Storageのセキュリティルールが設定されていない可能性があります。\n\nFirebase ConsoleでStorageのセキュリティルールを設定してください。';
+          }
+          
+          alert(errorMessage);
         } finally {
           setUploading(false);
         }

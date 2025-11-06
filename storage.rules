@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 目薬の動作写真
+    match /eyedrop-action/{userId}/{allPaths=**} {
+      // 認証済みユーザーが自分のUIDのフォルダにのみアクセス可能
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // その他のファイルは読み取り専用（必要に応じて追加）
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if false; // デフォルトで書き込み禁止
+    }
+  }
+}
