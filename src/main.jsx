@@ -4,6 +4,21 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 
+// Lightweight mobile console (eruda) auto-loader
+(() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const debugOn = params.get('debug') === '1' || localStorage.getItem('eruda') === 'on';
+    if (!debugOn) return;
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+    script.onload = () => {
+      try { window.eruda && window.eruda.init(); } catch {}
+    };
+    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(script));
+  } catch {}
+})();
+
 if ('serviceWorker' in navigator) {
   // Optional: reset SW via query param
   const params = new URLSearchParams(window.location.search);
