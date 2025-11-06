@@ -67,6 +67,8 @@ export function PhotoCapture() {
 
   // カメラを開始（向きを直接指定可能）
   const startCameraWithFacing = async (facing = null, selfieMode = null) => {
+    console.log('[PhotoCapture] startCameraWithFacing呼び出し:', { facing, selfieMode, currentIsSelfieMode: isSelfieMode });
+    
     // 既存ストリームを停止してから開始
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
@@ -75,11 +77,15 @@ export function PhotoCapture() {
     // facingが指定されている場合はそれを使う、なければselfieModeまたはisSelfieModeから推測
     const wantFront = facing ? (facing === 'user') : (selfieMode !== null ? selfieMode : !!isSelfieMode);
     const targetFacing = facing || (wantFront ? 'user' : 'environment');
+    console.log('[PhotoCapture] カメラ設定:', { wantFront, targetFacing, facing, selfieMode });
+    
     setCurrentFacing(targetFacing);
     // selfieModeが指定されている場合は状態も更新
     if (selfieMode !== null) {
       setIsSelfieMode(selfieMode);
+      console.log('[PhotoCapture] isSelfieModeを更新:', selfieMode);
     }
+    
     const tryConstraintsInOrder = async () => {
       const trials = [];
       if (wantFront) {
@@ -93,18 +99,30 @@ export function PhotoCapture() {
       // デバイス列挙（ラベルが取れない環境ではnullの可能性あり）
       const frontId = await pickCameraByLabel(/front|前面|内側|self|face/i);
       const backId = await pickCameraByLabel(/back|rear|背面|外側|world/i);
-      if (wantFront && frontId) trials.push({ video: { deviceId: { exact: frontId } } });
-      if (!wantFront && backId) trials.push({ video: { deviceId: { exact: backId } } });
+      console.log('[PhotoCapture] デバイスID:', { frontId, backId, wantFront });
+      
+      if (wantFront && frontId) {
+        trials.push({ video: { deviceId: { exact: frontId } } });
+      }
+      if (!wantFront && backId) {
+        trials.push({ video: { deviceId: { exact: backId } } });
+      }
 
-      // 最後のフォールバック（どれでも）
-      trials.push({ video: true });
+      // 最後のフォールバック（どれでも）は削除 - 指定した向きのカメラのみを許可
+      // trials.push({ video: true });
 
       let lastError = null;
-      for (const c of trials) {
+      for (let i = 0; i < trials.length; i++) {
+        const c = trials[i];
         try {
+          console.log(`[PhotoCapture] 制約 ${i + 1}/${trials.length} を試行:`, c);
           const s = await navigator.mediaDevices.getUserMedia(c);
+          const track = s.getVideoTracks()[0];
+          const settings = track.getSettings();
+          console.log('[PhotoCapture] カメラ取得成功:', settings);
           return s;
         } catch (e) {
+          console.warn(`[PhotoCapture] 制約 ${i + 1}/${trials.length} 失敗:`, e.message);
           lastError = e;
         }
       }
@@ -242,11 +260,13 @@ export function PhotoCapture() {
       alert('まずカメラを開始してください');
       return;
     }
-    // 自撮りモードでない場合は通常撮影にフォールバック
-    if (!isSelfieMode) {
+    // 自撮りモードでない場合、または背面カメラの場合は通常撮影にフォールバック
+    if (!isSelfieMode || currentFacing === 'environment') {
+      console.log('[PhotoCapture] 自撮りモードではないため、通常撮影にフォールバック', { isSelfieMode, currentFacing });
       capturePhoto();
       return;
     }
+    console.log('[PhotoCapture] 自撮りモードでカウントダウン開始', { isSelfieMode, currentFacing });
     setIsCapturing(true);
     setCapturedPhotos([]);
     setCurrentPhotoIndex(0);
@@ -738,15 +758,15 @@ export function PhotoCapture() {
           </div>
           
           <div className="photo-controls">
-            {/* 自撮りモード：カウントダウン撮影ボタン */}
-            {isSelfieMode && capturedPhotos.length === 0 && countdown === null && !isCapturing && (
+            {/* 自撮りモード：カウントダウン撮影ボタン（前面カメラかつ自撮りモードの場合のみ） */}
+            {isSelfieMode && currentFacing === 'user' && capturedPhotos.length === 0 && countdown === null && !isCapturing && (
               <button onClick={startSelfieCapture} className="photo-btn-capture-selfie" disabled={isCapturing}>
                 📸 撮影
               </button>
             )}
             
-            {/* 通常モード：1枚撮影ボタン */}
-            {isSelfieMode === false && !photoUrl && (
+            {/* 通常モード：1枚撮影ボタン（背面カメラまたは通常モードの場合） */}
+            {(!isSelfieMode || currentFacing === 'environment') && !photoUrl && capturedPhotos.length === 0 && (
               <button onClick={capturePhoto} className="photo-btn-capture">
                 📸 撮影
               </button>
