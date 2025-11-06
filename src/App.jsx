@@ -61,6 +61,26 @@ function AppContent() {
     localStorage.setItem(settingsKey, JSON.stringify(settings));
   }, [settings, settingsKey]);
 
+  // ログイン後に通知許可を要求
+  useEffect(() => {
+    if (!user) return;
+    
+    // 通知許可が`default`の場合は自動的に要求
+    if ('Notification' in window && Notification.permission === 'default') {
+      console.log('[App] ログイン検出: 通知許可を要求します');
+      requestPermission().then((permission) => {
+        console.log('[App] 通知許可結果:', permission);
+        if (permission === 'granted') {
+          console.log('[App] ✅ 通知許可が取得されました');
+        } else if (permission === 'denied') {
+          console.warn('[App] ⚠️ 通知許可が拒否されました');
+        }
+      }).catch((err) => {
+        console.error('[App] 通知許可要求エラー:', err);
+      });
+    }
+  }, [user]);
+
   // start local scheduler
   useEffect(() => {
     requestPermission();
