@@ -351,6 +351,40 @@ function AppContent() {
     setData((prev) => ({ ...prev, [key]: { morning: false, noon: false, night: false, note: '' } }));
   };
 
+  const resetApp = async () => {
+    if (!confirm('アプリを完全にリセットしますか？\n\nこれにより、Service Workerのキャッシュとアプリの設定がクリアされます。')) {
+      return;
+    }
+    
+    try {
+      // Service Workerを登録解除
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          await registration.unregister();
+          console.log('[App] Service Workerを登録解除しました');
+        }
+      }
+      
+      // キャッシュをクリア
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        console.log('[App] キャッシュをクリアしました');
+      }
+      
+      // localStorageをクリア（任意）
+      // 注意: データを保持したい場合は、この部分をコメントアウトしてください
+      // localStorage.clear();
+      
+      // 強制リロード（キャッシュを無視）
+      window.location.href = window.location.origin + window.location.pathname;
+    } catch (err) {
+      console.error('[App] リセットエラー:', err);
+      alert('リセット中にエラーが発生しました。ページを手動でリロードしてください。');
+    }
+  };
+
   const doneCount = SLOTS.filter(s => day[s.id]).length;
   const progress = Math.round((doneCount / SLOTS.length) * 100);
 
@@ -633,6 +667,22 @@ function AppContent() {
           ))}
         </div>
         <p className="hint">※ 通知はブラウザの設定に依存します。PWA化で安定化可能。</p>
+        <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
+          <button
+            className="btn"
+            onClick={resetApp}
+            style={{ 
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: 'white',
+              fontSize: '14px',
+              padding: '8px 16px'
+            }}
+          >アプリを完全にリセット</button>
+          <p className="hint" style={{ marginTop: '8px', fontSize: '12px' }}>
+            Service Workerのキャッシュとアプリの設定をクリアして、初回起動時の状態に戻します<br />
+            （通知許可の問題が解決しない場合にお試しください）
+          </p>
+        </div>
       </section>
 
       <FamilyNotification />
